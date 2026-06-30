@@ -45,7 +45,7 @@ public class WelcomeTab {
 
         // Subtitle
         Label sub = new Label(root, SWT.CENTER);
-        sub.setText("xterm-256color terminal emulator");
+        sub.setText("xterm-256color terminal emulator  —  build #" + br.com.quatorzebis.ssh.BuildInfo.BUILD);
         sub.setBackground(display.getSystemColor(SWT.COLOR_BLACK));
         sub.setForeground(new Color(display, 140, 140, 140));
         sub.setLayoutData(new GridData(SWT.CENTER, SWT.CENTER, true, false));
