@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-set JAR=14bis-ssh-1.0.0-shaded.jar
+set JAR=14bis-ssh-1.0.0.jar
 set REQUIRED_JAVA=21
 set OK=1
 
@@ -35,7 +35,7 @@ if !OK!==1 (
 if !OK!==0 ( pause & exit /b 1 )
 
 :: ── Build ─────────────────────────────────────────────────────
-call mvn -q clean package -DskipTests
+call mvn clean package -DskipTests
 if errorlevel 1 ( echo [ERROR] Build failed. & pause & exit /b 1 )
 
 :: ── Run ──────────────────────────────────────────────────────
