@@ -358,8 +358,8 @@ public class TerminalTab {
             gc.setBackground(defaultBg);
             gc.fillRectangle(area);
 
-            int cols    = area.width  / charWidth;
-            int rows    = area.height / charHeight;
+            int cols    = emulator.getCols();
+            int rows    = emulator.getRows();
             int curRow  = emulator.getCursorRow();
             int curCol  = emulator.getCursorCol();
 

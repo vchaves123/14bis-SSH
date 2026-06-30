@@ -100,6 +100,7 @@ public class TerminalEmulator {
     private int utf8Remaining  = 0;
     private int utf8Codepoint  = 0;
 
+
     // -----------------------------------------------------------------------
     // Listeners
     // -----------------------------------------------------------------------
