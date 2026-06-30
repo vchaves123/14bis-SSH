@@ -99,15 +99,16 @@ public class WelcomeTab {
         filler.setBackground(display.getSystemColor(SWT.COLOR_BLACK));
         filler.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, true));
 
-        // Version label — bottom-right, subtle
+        // Version label — bottom-right
         Label lblVersion = new Label(root, SWT.RIGHT);
         lblVersion.setText(buildVersion());
         lblVersion.setBackground(display.getSystemColor(SWT.COLOR_BLACK));
-        lblVersion.setForeground(new Color(display, 70, 70, 70));
-        Font versionFont = new Font(display, "Consolas", 9, SWT.NORMAL);
+        lblVersion.setForeground(new Color(display, 120, 120, 120));
+        Font versionFont = new Font(display, "Consolas", 10, SWT.NORMAL);
         lblVersion.setFont(versionFont);
         GridData gdVer = new GridData(SWT.FILL, SWT.CENTER, true, false);
         gdVer.horizontalIndent = 0;
+        gdVer.verticalIndent = 4;
         lblVersion.setLayoutData(gdVer);
         lblVersion.addDisposeListener(e -> versionFont.dispose());
 
