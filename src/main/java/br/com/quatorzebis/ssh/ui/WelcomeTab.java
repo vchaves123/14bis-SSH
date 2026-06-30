@@ -122,18 +122,17 @@ public class WelcomeTab {
             if (is != null) {
                 Properties p = new Properties();
                 p.load(is);
-                String version = p.getProperty("build.version", "?");
-                String raw      = p.getProperty("build.timestamp", "");
-                String ts = raw;
+                String raw = p.getProperty("build.timestamp", "");
+                String ts  = raw;
                 try {
                     ts = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
                             .withZone(ZoneId.systemDefault())
                             .format(Instant.parse(raw));
                 } catch (Exception ignored) {}
-                return "v" + version + "  build #" + br.com.quatorzebis.ssh.BuildInfo.BUILD + "  built " + ts;
+                return "build #" + br.com.quatorzebis.ssh.BuildInfo.BUILD + "  —  " + ts;
             }
         } catch (Exception ignored) {}
-        return "dev";
+        return "build #" + br.com.quatorzebis.ssh.BuildInfo.BUILD;
     }
 
     private static void spacer(Composite parent, int height) {
