@@ -7,11 +7,7 @@ import org.eclipse.swt.graphics.*;
 import org.eclipse.swt.layout.*;
 import org.eclipse.swt.widgets.*;
 
-import java.io.InputStream;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.util.Properties;
+import br.com.quatorzebis.ssh.BuildInfo;
 
 public class WelcomeTab {
 
@@ -45,7 +41,7 @@ public class WelcomeTab {
 
         // Subtitle
         Label sub = new Label(root, SWT.CENTER);
-        sub.setText("xterm-256color terminal emulator  —  build #" + br.com.quatorzebis.ssh.BuildInfo.BUILD);
+        sub.setText("xterm-256color terminal emulator  —  build #" + BuildInfo.BUILD);
         sub.setBackground(display.getSystemColor(SWT.COLOR_BLACK));
         sub.setForeground(new Color(display, 140, 140, 140));
         sub.setLayoutData(new GridData(SWT.CENTER, SWT.CENTER, true, false));
@@ -101,7 +97,7 @@ public class WelcomeTab {
 
         // Version label — bottom-right
         Label lblVersion = new Label(root, SWT.RIGHT);
-        lblVersion.setText(buildVersion());
+        lblVersion.setText("v" + BuildInfo.VERSION + "  build #" + BuildInfo.BUILD + "  —  " + BuildInfo.DATE);
         lblVersion.setBackground(display.getSystemColor(SWT.COLOR_BLACK));
         lblVersion.setForeground(new Color(display, 120, 120, 120));
         Font versionFont = new Font(display, "Consolas", 10, SWT.NORMAL);
@@ -117,25 +113,7 @@ public class WelcomeTab {
 
     public CTabItem getTabItem() { return tabItem; }
 
-    private static String buildVersion() {
-        try (InputStream is = WelcomeTab.class.getResourceAsStream("/build.properties")) {
-            if (is != null) {
-                Properties p = new Properties();
-                p.load(is);
-                String raw = p.getProperty("build.timestamp", "");
-                String ts  = raw;
-                try {
-                    ts = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-                            .withZone(ZoneId.systemDefault())
-                            .format(Instant.parse(raw));
-                } catch (Exception ignored) {}
-                return "build #" + br.com.quatorzebis.ssh.BuildInfo.BUILD + "  —  " + ts;
-            }
-        } catch (Exception ignored) {}
-        return "build #" + br.com.quatorzebis.ssh.BuildInfo.BUILD;
-    }
-
-    private static void spacer(Composite parent, int height) {
+private static void spacer(Composite parent, int height) {
         Label gap = new Label(parent, SWT.NONE);
         gap.setBackground(parent.getDisplay().getSystemColor(SWT.COLOR_BLACK));
         GridData gd = new GridData(SWT.FILL, SWT.CENTER, true, false);
