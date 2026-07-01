@@ -104,8 +104,12 @@ public class TerminalTab {
     // Logging
     // -----------------------------------------------------------------------
     private OutputStream logStream;
-    private static final DateTimeFormatter LOG_TS       = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
+    private static final DateTimeFormatter LOG_TS = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
     private static final java.util.concurrent.atomic.AtomicInteger LOG_SEQ = new java.util.concurrent.atomic.AtomicInteger();
+
+    // State machine for stripping ANSI escape sequences from the log stream.
+    private enum AnsiState { NORMAL, ESC, CSI, OSC, OSC_ESC }
+    private AnsiState ansiState = AnsiState.NORMAL;
 
     // -----------------------------------------------------------------------
     // Constructor
@@ -678,8 +682,9 @@ public class TerminalTab {
             Path   file = logDir.resolve(candidate + ".log");
             if (Files.exists(file))
                 file = logDir.resolve(candidate + "_" + LOG_SEQ.incrementAndGet() + ".log");
-            logStream = Files.newOutputStream(file,
+            logStream  = Files.newOutputStream(file,
                 StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            ansiState  = AnsiState.NORMAL;
         } catch (IOException e) {
             logStream = null;
         }
@@ -687,8 +692,59 @@ public class TerminalTab {
 
     private void writeLog(byte[] buf, int len) {
         if (logStream == null) return;
-        try { logStream.write(buf, 0, len); logStream.flush(); }
+        byte[] filtered = stripAnsi(buf, len);
+        if (filtered.length == 0) return;
+        try { logStream.write(filtered); logStream.flush(); }
         catch (IOException ignored) { logStream = null; }
+    }
+
+    private byte[] stripAnsi(byte[] buf, int len) {
+        byte[] out = new byte[len];
+        int    w   = 0;
+        for (int i = 0; i < len; i++) {
+            int b = buf[i] & 0xFF;
+            switch (ansiState) {
+                case NORMAL:
+                    if (b == 0x1B) {
+                        ansiState = AnsiState.ESC;
+                    } else if (b == '\r' || b == '\n' || b == '\t') {
+                        out[w++] = (byte) b;
+                    } else if (b >= 0x20 && b < 0x7F) {
+                        out[w++] = (byte) b;
+                    } else if (b >= 0x80) {
+                        // UTF-8 continuation / leading bytes — pass through
+                        out[w++] = (byte) b;
+                    }
+                    // other control chars (0x00-0x1F except \r\n\t) — discard
+                    break;
+                case ESC:
+                    if (b == '[') {
+                        ansiState = AnsiState.CSI;
+                    } else if (b == ']') {
+                        ansiState = AnsiState.OSC;
+                    } else {
+                        // 2-char ESC sequence — consume this byte and return to NORMAL
+                        ansiState = AnsiState.NORMAL;
+                    }
+                    break;
+                case CSI:
+                    // CSI ends at a byte in 0x40–0x7E (the "final" byte)
+                    if (b >= 0x40 && b <= 0x7E) ansiState = AnsiState.NORMAL;
+                    break;
+                case OSC:
+                    if (b == 0x07) {            // BEL terminates OSC
+                        ansiState = AnsiState.NORMAL;
+                    } else if (b == 0x1B) {     // ESC inside OSC → expect '\'
+                        ansiState = AnsiState.OSC_ESC;
+                    }
+                    break;
+                case OSC_ESC:
+                    // ESC \ (ST) terminates OSC
+                    ansiState = AnsiState.NORMAL;
+                    break;
+            }
+        }
+        return java.util.Arrays.copyOf(out, w);
     }
 
     private void closeLog() {
