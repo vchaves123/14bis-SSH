@@ -33,8 +33,11 @@ public class SessionTreePanel {
     /** Called after any session/group is created, edited, or deleted. */
     private Runnable onChanged = () -> {};
 
-    /** Item currently being dragged (SessionInfo or String group name). */
+    /** Item(s) currently being dragged: a SessionInfo, a String group name, or a List&lt;SessionInfo&gt;. */
     private Object dragging;
+
+    /** True until the first reload() completes — new groups default to expanded only then. */
+    private boolean firstReload = true;
 
     /** Folder icon drawn for group tree items. */
     private final Image folderIcon;
@@ -277,7 +280,7 @@ public class SessionTreePanel {
     public void newSession(String group) {
         SessionDialog dlg = new SessionDialog(shell, group);
         SessionInfo result = dlg.open();
-        if (result != null) { reload(); onChanged.run(); }
+        if (result != null) { reload(); expandGroup(result.group); onChanged.run(); }
     }
 
     private void newGroup() {
@@ -298,7 +301,7 @@ public class SessionTreePanel {
         SessionDialog dlg = new SessionDialog(shell, s.group);
         dlg.setEditing(s);
         SessionInfo updated = dlg.open();
-        if (updated != null) { reload(); onChanged.run(); }
+        if (updated != null) { reload(); expandGroup(updated.group); onChanged.run(); }
     }
 
     private void renameSelected() {
@@ -441,7 +444,7 @@ public class SessionTreePanel {
             gi.setForeground(colorGroup);
             gi.setBackground(colorBg);
             gi.setData(g);
-            gi.setExpanded(expanded.isEmpty() || expanded.contains(g));
+            gi.setExpanded(firstReload || expanded.contains(g));
             groupItems.put(g, gi);
         }
 
@@ -463,7 +466,7 @@ public class SessionTreePanel {
                     parent.setForeground(colorGroup);
                     parent.setBackground(colorBg);
                     parent.setData(s.group);
-                    parent.setExpanded(true);
+                    parent.setExpanded(firstReload || expanded.contains(s.group));
                     groupItems.put(s.group, parent);
                 }
                 TreeItem item = new TreeItem(parent, SWT.NONE);
@@ -474,6 +477,7 @@ public class SessionTreePanel {
                 item.setData(s);
             }
         }
+        firstReload = false;
     }
 
     // -----------------------------------------------------------------------
@@ -486,14 +490,33 @@ public class SessionTreePanel {
             @Override
             public void dragStart(DragSourceEvent e) {
                 TreeItem[] sel = tree.getSelection();
-                if (sel.length == 0 || sel[0].getData() == null) { e.doit = false; return; }
-                dragging = sel[0].getData();
+                if (sel.length == 0) { e.doit = false; return; }
+
+                if (sel.length > 1) {
+                    // Multi-drag is only supported when every selected item is a
+                    // session — dragging a mix of sessions/groups, or several
+                    // groups at once, isn't a well-defined move.
+                    java.util.List<SessionInfo> sessions = new ArrayList<>();
+                    for (TreeItem ti : sel) {
+                        if (ti.getData() instanceof SessionInfo s) sessions.add(s);
+                        else { e.doit = false; return; }
+                    }
+                    dragging = sessions;
+                } else {
+                    Object data = sel[0].getData();
+                    if (data == null) { e.doit = false; return; }
+                    dragging = data;
+                }
             }
             @Override
             public void dragSetData(DragSourceEvent e) {
                 if (!TextTransfer.getInstance().isSupportedType(e.dataType)) return;
-                if      (dragging instanceof SessionInfo s) e.data = "session:" + s.id;
-                else if (dragging instanceof String g)      e.data = "group:"   + g;
+                if (dragging instanceof java.util.List<?> list) {
+                    StringBuilder sb = new StringBuilder("sessions:");
+                    for (Object o : list) if (o instanceof SessionInfo s) sb.append(s.id).append(',');
+                    e.data = sb.toString();
+                } else if (dragging instanceof SessionInfo s) e.data = "session:" + s.id;
+                else if (dragging instanceof String g)        e.data = "group:"   + g;
             }
             @Override
             public void dragFinished(DragSourceEvent e) { dragging = null; }
@@ -529,13 +552,31 @@ public class SessionTreePanel {
                     targetGroup = g;
 
                 try {
-                    if (dragging instanceof SessionInfo s) {
+                    if (dragging instanceof java.util.List<?> list) {
+                        boolean moved = false;
+                        for (Object o : list) {
+                            if (!(o instanceof SessionInfo s)) continue;
+                            String cur = s.group == null ? "" : s.group;
+                            if (!cur.equals(targetGroup)) {
+                                SessionStorage.delete(s);
+                                s.group = targetGroup;
+                                SessionStorage.save(s);
+                                moved = true;
+                            }
+                        }
+                        if (moved) {
+                            reload();
+                            expandGroup(targetGroup);
+                            onChanged.run();
+                        }
+                    } else if (dragging instanceof SessionInfo s) {
                         String cur = s.group == null ? "" : s.group;
                         if (!cur.equals(targetGroup)) {
                             SessionStorage.delete(s);   // remove from old location
                             s.group = targetGroup;
                             SessionStorage.save(s);     // write to new location
                             reload();
+                            expandGroup(targetGroup);
                             onChanged.run();
                         }
                     } else if (dragging instanceof String srcGroup) {
