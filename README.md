@@ -23,7 +23,7 @@ A lightweight SSH terminal client with a built-in xterm-256color emulator, built
 | Component | Minimum |
 |-----------|---------|
 | Java | 17 or newer |
-| OS | Windows 10+, Linux (GTK 3) |
+| OS | Windows 10+, Linux (GTK 3), macOS 11+ |
 
 ## Installation
 
@@ -79,7 +79,7 @@ Log files are saved as `yyyyMMdd_HHmmss_<name>.log` under the configured directo
 
 ## License
 
-Copyright (C) 2026 Vicente Melo
+Copyright (C) 2026 Vicente Melo — Molho Ltda.
 
 This program is free software: you can redistribute it and/or modify it under the terms of the
 **GNU General Public License version 3** as published by the Free Software Foundation.
