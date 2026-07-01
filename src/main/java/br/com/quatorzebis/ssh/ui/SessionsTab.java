@@ -1,6 +1,7 @@
 package br.com.quatorzebis.ssh.ui;
 
 import br.com.quatorzebis.ssh.BuildInfo;
+import br.com.quatorzebis.ssh.UpdateChecker;
 import br.com.quatorzebis.ssh.model.SessionInfo;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.CTabFolder;
@@ -8,6 +9,7 @@ import org.eclipse.swt.custom.CTabItem;
 import org.eclipse.swt.custom.SashForm;
 import org.eclipse.swt.graphics.*;
 import org.eclipse.swt.layout.*;
+import org.eclipse.swt.program.Program;
 import org.eclipse.swt.widgets.*;
 
 import java.util.function.Consumer;
@@ -140,6 +142,27 @@ public class SessionsTab {
         lblVersion.setFont(vFont);
         lblVersion.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
         lblVersion.addDisposeListener(e -> vFont.dispose());
+
+        // Update notice — hidden until a newer release is found on GitHub
+        Link lblUpdate = new Link(info, SWT.RIGHT);
+        lblUpdate.setBackground(display.getSystemColor(SWT.COLOR_BLACK));
+        lblUpdate.setForeground(new Color(display, 102, 204, 255));
+        Font updFont = new Font(display, "Consolas", 9, SWT.NORMAL);
+        lblUpdate.setFont(updFont);
+        GridData gdUpdate = new GridData(SWT.FILL, SWT.CENTER, true, false);
+        gdUpdate.exclude = true;
+        lblUpdate.setLayoutData(gdUpdate);
+        lblUpdate.setVisible(false);
+        lblUpdate.addDisposeListener(e -> updFont.dispose());
+        lblUpdate.addListener(SWT.Selection, e -> Program.launch(UpdateChecker.RELEASES_URL));
+
+        UpdateChecker.checkAsync(newVersion -> display.asyncExec(() -> {
+            if (lblUpdate.isDisposed()) return;
+            lblUpdate.setText("New version v" + newVersion + " available — <a href=\"download\">Download</a>");
+            gdUpdate.exclude = false;
+            lblUpdate.setVisible(true);
+            lblUpdate.getParent().layout(true, true);
+        }));
 
         sash.setWeights(new int[]{ 28, 72 });
         tabItem.setControl(sash);
