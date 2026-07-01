@@ -274,6 +274,12 @@ public class MainWindow {
                 new MenuItem(menu, SWT.SEPARATOR);
             }
 
+            MenuItem miRename = new MenuItem(menu, SWT.PUSH);
+            miRename.setText("Rename Tab...");
+            miRename.addListener(SWT.Selection, ev -> renameTab(item));
+
+            new MenuItem(menu, SWT.SEPARATOR);
+
             MenuItem miDuplicate = new MenuItem(menu, SWT.PUSH);
             miDuplicate.setText("Duplicate Session");
             miDuplicate.addListener(SWT.Selection, ev -> {
@@ -333,6 +339,15 @@ public class MainWindow {
             menu.setLocation(e.x, e.y);
             menu.setVisible(true);
         });
+    }
+
+    private void renameTab(CTabItem item) {
+        InputDialog dlg = new InputDialog(shell, "Rename Tab", "Tab title:");
+        dlg.setInitialValue(item.getText().trim());
+        String name = dlg.open();
+        if (name != null && !name.trim().isEmpty()) {
+            item.setText(name.trim());
+        }
     }
 
     private void showLogSettingsDialog(TerminalTab terminal) {
@@ -433,7 +448,7 @@ public class MainWindow {
 
             if (Math.abs(e.x - dragStartX) < DRAG_THRESHOLD) return;
 
-            int insertIdx = dropIndexAt(e.x, src);
+            int insertIdx = Math.max(FIRST_MOVABLE_INDEX, dropIndexAt(e.x, src));
             int srcIdx    = tabFolder.indexOf(src);
             if (insertIdx == srcIdx || insertIdx == srcIdx + 1) return;
 
@@ -443,7 +458,7 @@ public class MainWindow {
         // Paint the drop-position indicator (a bright vertical bar)
         tabFolder.addListener(SWT.Paint, e -> {
             if (dropIndicatorX < 0 || draggedTab == null) return;
-            int insertIdx = dropIndexAt(dropIndicatorX, draggedTab);
+            int insertIdx = Math.max(FIRST_MOVABLE_INDEX, dropIndexAt(dropIndicatorX, draggedTab));
             int lineX     = insertLineX(insertIdx);
             if (lineX < 0) return;
             e.gc.setForeground(new Color(display, 80, 180, 255));
@@ -472,6 +487,9 @@ public class MainWindow {
         }
         return items.length;
     }
+
+    /** The Home tab is always first; no other tab may be dropped before it. */
+    private static final int FIRST_MOVABLE_INDEX = 1;
 
     /**
      * Moves a CTabItem from srcIdx to insertIdx by recreating it at the new position.

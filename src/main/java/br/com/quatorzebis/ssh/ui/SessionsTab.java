@@ -31,7 +31,7 @@ public class SessionsTab {
                        Runnable onCredentials, Runnable onAbout) {
 
         tabItem = new CTabItem(folder, SWT.NONE);   // no close button
-        tabItem.setText("Sessions");
+        tabItem.setText("  Home  ");   // extra padding either side of the label
 
         Display display = folder.getDisplay();
 
