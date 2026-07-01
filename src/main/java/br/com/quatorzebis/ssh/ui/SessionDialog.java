@@ -146,11 +146,16 @@ public class SessionDialog {
         Button btnLogBrowse = new Button(cmpLog, SWT.PUSH);
         btnLogBrowse.setText("…");
 
-        String defaultLogDir = System.getProperty("user.home") + "/.ssh/log";
+        String defaultLogDir = System.getProperty("user.home") + "/.14bis/log";
         txtLogDir.setText(defaultLogDir);
 
-        chkLog.addListener(SWT.Selection, e -> txtLogDir.setEnabled(chkLog.getSelection()));
+        chkLog.addListener(SWT.Selection, e -> {
+            boolean on = chkLog.getSelection();
+            txtLogDir.setEnabled(on);
+            btnLogBrowse.setEnabled(on);
+        });
         txtLogDir.setEnabled(false);
+        btnLogBrowse.setEnabled(false);
 
         btnLogBrowse.addListener(SWT.Selection, e -> {
             DirectoryDialog dd = new DirectoryDialog(dlg, SWT.NONE);
@@ -159,6 +164,20 @@ public class SessionDialog {
             String chosen = dd.open();
             if (chosen != null) txtLogDir.setText(chosen);
         });
+
+        label(dlg, "");
+        Composite cmpLogFile = new Composite(dlg, SWT.NONE);
+        cmpLogFile.setLayoutData(fill());
+        GridLayout glLogFile = new GridLayout(2, false);
+        glLogFile.marginWidth = 0; glLogFile.marginHeight = 0; glLogFile.horizontalSpacing = 6;
+        cmpLogFile.setLayout(glLogFile);
+        Label lblLogFile = new Label(cmpLogFile, SWT.NONE);
+        lblLogFile.setText("File name:");
+        Text txtLogFileName = new Text(cmpLogFile, SWT.BORDER);
+        txtLogFileName.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        txtLogFileName.setMessage("e.g. session (timestamp prepended automatically)");
+        txtLogFileName.setEnabled(false);
+        chkLog.addListener(SWT.Selection, e -> txtLogFileName.setEnabled(chkLog.getSelection()));
 
         // ── Appearance ────────────────────────────────────────────────────────
         label(dlg, "Appearance:");
@@ -289,7 +308,11 @@ public class SessionDialog {
             chkLog.setSelection(editing.logEnabled);
             if (editing.logDir != null && !editing.logDir.isBlank())
                 txtLogDir.setText(editing.logDir);
+            if (editing.logFileName != null && !editing.logFileName.isBlank())
+                txtLogFileName.setText(editing.logFileName);
             txtLogDir.setEnabled(editing.logEnabled);
+            btnLogBrowse.setEnabled(editing.logEnabled);
+            txtLogFileName.setEnabled(editing.logEnabled);
         }
         updateAuth.run();
         dlg.pack();
@@ -332,8 +355,9 @@ public class SessionDialog {
             s.appearFontSize = appFontSize[0];
             s.appearFgR = appFg[0]; s.appearFgG = appFg[1]; s.appearFgB = appFg[2];
             s.appearBgR = appBg[0]; s.appearBgG = appBg[1]; s.appearBgB = appBg[2];
-            s.logEnabled = chkLog.getSelection();
-            s.logDir     = txtLogDir.getText().trim();
+            s.logEnabled  = chkLog.getSelection();
+            s.logDir      = txtLogDir.getText().trim();
+            s.logFileName = txtLogFileName.getText().trim();
 
             try { SessionStorage.save(s); result = s; dlg.dispose(); }
             catch (IOException ex) { alert(dlg, "Failed to save session:\n" + ex.getMessage()); }

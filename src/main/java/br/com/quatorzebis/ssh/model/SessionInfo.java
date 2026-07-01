@@ -23,8 +23,9 @@ public class SessionInfo {
     public int      appearFgR = 204, appearFgG = 204, appearFgB = 204;
     public int      appearBgR = 0,   appearBgG = 0,   appearBgB = 0;
     /** Session logging. */
-    public boolean  logEnabled = false;
-    public String   logDir     = "";
+    public boolean  logEnabled  = false;
+    public String   logDir      = "";
+    public String   logFileName = "";
 
     /** Label shown in the tab title and session tree. */
     public String label() {

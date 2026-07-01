@@ -666,12 +666,14 @@ public class TerminalTab {
         try {
             String dir = (info.logDir != null && !info.logDir.isBlank())
                          ? info.logDir
-                         : System.getProperty("user.home") + "/.ssh/log";
+                         : System.getProperty("user.home") + "/.14bis/log";
             Path logDir = Path.of(dir);
             Files.createDirectories(logDir);
-            String ts   = LocalDateTime.now().format(LOG_TS);
-            String host = info.host.replaceAll("[^\\w\\-.]", "_");
-            Path   file = logDir.resolve(ts + "_" + host + ".log");
+            String ts       = LocalDateTime.now().format(LOG_TS);
+            String baseName = (info.logFileName != null && !info.logFileName.isBlank())
+                              ? info.logFileName.replaceAll("[^\\w\\-.]", "_")
+                              : info.host.replaceAll("[^\\w\\-.]", "_");
+            Path   file = logDir.resolve(ts + "_" + baseName + ".log");
             logStream = Files.newOutputStream(file,
                 StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (IOException e) {
