@@ -77,6 +77,10 @@ Log files are saved as `yyyyMMdd_HHmmss_<name>.log` under the configured directo
 | `Ctrl+Tab` | Next tab |
 | `Ctrl+Shift+Tab` | Previous tab |
 
+## Code signing
+
+The Windows installer is code-signed. This project uses [SignPath Foundation](https://signpath.io/code-signing-for-open-source/) for code signing of Windows installers.
+
 ## License
 
 Copyright (C) 2026 Vicente Melo — Molho Ltda.
