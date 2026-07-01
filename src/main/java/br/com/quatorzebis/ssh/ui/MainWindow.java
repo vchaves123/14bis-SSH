@@ -240,8 +240,11 @@ public class MainWindow {
         gl.marginWidth = 24; gl.marginHeight = 18; gl.verticalSpacing = 12;
         dlg.setLayout(gl);
 
-        Label lbl = new Label(dlg, SWT.NONE);
-        lbl.setText("14bis SSH Client\nVersion 1.0.0\n\nxterm-256color terminal emulator built with SWT.");
+        Label lbl = new Label(dlg, SWT.CENTER);
+        lbl.setText("14bis SSH Client\nVersion " + br.com.quatorzebis.ssh.BuildInfo.VERSION
+            + "  (build #" + br.com.quatorzebis.ssh.BuildInfo.BUILD + ", " + br.com.quatorzebis.ssh.BuildInfo.DATE + ")"
+            + "\n\nxterm-256color terminal emulator built with SWT."
+            + "\n\nCopyright (C) 2026 Vicente Melo — Molho Ltda.");
         lbl.setLayoutData(new GridData(SWT.CENTER, SWT.CENTER, true, false));
 
         Label lblThirdParty = new Label(dlg, SWT.NONE);
