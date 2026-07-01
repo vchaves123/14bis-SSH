@@ -108,6 +108,7 @@ jobs:
             --copyright "Copyright (C) 2026 Vicente Melo - Molho Ltda." ^
             --description "Lightweight SSH terminal client" ^
             --icon target\app-icon.ico ^
+            --win-upgrade-uuid "C7A3F2E1-84BD-4D9A-B06E-2F1C3A5D8E90" ^
             --win-dir-chooser ^
             --win-menu ^
             --win-shortcut ^
