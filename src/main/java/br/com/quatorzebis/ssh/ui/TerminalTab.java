@@ -671,7 +671,7 @@ public class TerminalTab {
         try {
             String dir = (info.logDir != null && !info.logDir.isBlank())
                          ? info.logDir
-                         : System.getProperty("user.home") + "/.14bis/log";
+                         : System.getProperty("user.home") + "/.14bis/screen_captures";
             Path logDir = Path.of(dir);
             Files.createDirectories(logDir);
             String ts       = LocalDateTime.now().format(LOG_TS);

@@ -146,7 +146,7 @@ public class SessionDialog {
         Button btnLogBrowse = new Button(cmpLog, SWT.PUSH);
         btnLogBrowse.setText("…");
 
-        String defaultLogDir = System.getProperty("user.home") + "/.14bis/log";
+        String defaultLogDir = System.getProperty("user.home") + "/.14bis/screen_captures";
         txtLogDir.setText(defaultLogDir);
 
         chkLog.addListener(SWT.Selection, e -> {
