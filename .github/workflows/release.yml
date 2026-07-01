@@ -1,0 +1,140 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'           # trigger on version tags: v1.0.0, v1.2.3, etc.
+  workflow_dispatch:   # allow manual trigger from GitHub UI
+
+jobs:
+  build:
+    name: Build — ${{ matrix.os-label }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - runner:     windows-latest
+            os-label:   Windows
+            mvn-profile: windows
+            pkg-type:   exe
+            asset-name: 14bis-SSH-windows.exe
+
+          - runner:     ubuntu-latest
+            os-label:   Linux
+            mvn-profile: linux
+            pkg-type:   deb
+            asset-name: 14bis-SSH-linux.deb
+
+          - runner:     macos-latest
+            os-label:   macOS (Apple Silicon)
+            mvn-profile: macos-arm
+            pkg-type:   dmg
+            asset-name: 14bis-SSH-macos.dmg
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Build fat JAR
+        run: mvn package -P ${{ matrix.mvn-profile }} -B -q
+
+      - name: Package with jpackage (Windows)
+        if: matrix.runner == 'windows-latest'
+        shell: cmd
+        run: |
+          jpackage ^
+            --input target ^
+            --name "14bis SSH" ^
+            --main-jar 14bis-ssh-1.0.0.jar ^
+            --main-class br.com.quatorzebis.ssh.Main ^
+            --type exe ^
+            --app-version 1.0.0 ^
+            --vendor "Molho Ltda." ^
+            --copyright "Copyright (C) 2026 Vicente Melo - Molho Ltda." ^
+            --description "Lightweight SSH terminal client" ^
+            --win-dir-chooser ^
+            --win-menu ^
+            --win-shortcut ^
+            --dest installer
+
+      - name: Package with jpackage (Linux)
+        if: matrix.runner == 'ubuntu-latest'
+        run: |
+          jpackage \
+            --input target \
+            --name "14bis-ssh" \
+            --main-jar 14bis-ssh-1.0.0.jar \
+            --main-class br.com.quatorzebis.ssh.Main \
+            --type deb \
+            --app-version 1.0.0 \
+            --vendor "Molho Ltda." \
+            --copyright "Copyright (C) 2026 Vicente Melo - Molho Ltda." \
+            --description "Lightweight SSH terminal client" \
+            --linux-shortcut \
+            --dest installer
+
+      - name: Package with jpackage (macOS)
+        if: matrix.runner == 'macos-latest'
+        run: |
+          jpackage \
+            --input target \
+            --name "14bis SSH" \
+            --main-jar 14bis-ssh-1.0.0.jar \
+            --main-class br.com.quatorzebis.ssh.Main \
+            --type dmg \
+            --app-version 1.0.0 \
+            --vendor "Molho Ltda." \
+            --copyright "Copyright (C) 2026 Vicente Melo - Molho Ltda." \
+            --description "Lightweight SSH terminal client" \
+            --dest installer
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset-name }}
+          path: installer/*
+          retention-days: 7
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all installers
+        uses: actions/download-artifact@v4
+        with:
+          path: installers
+          merge-multiple: true
+
+      - name: Create release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "14bis SSH ${{ github.ref_name }}"
+          body: |
+            ## 14bis SSH ${{ github.ref_name }}
+
+            **Molho Ltda. — Copyright (C) 2026 Vicente Melo**
+
+            ### Downloads
+
+            | Platform | File |
+            |----------|------|
+            | Windows  | `14bis-SSH-windows.exe` |
+            | Linux    | `14bis-SSH-linux.deb` |
+            | macOS    | `14bis-SSH-macos.dmg` |
+
+            > Java is bundled — no separate installation required.
+
+          files: installers/*
+          draft: false
+          prerelease: false
