@@ -983,7 +983,14 @@ public class TerminalTab {
         activityPending = false;
         blinkRunning    = false;
         display.asyncExec(() -> {
-            if (!tabItem.isDisposed() && !disconnected) {
+            if (tabItem.isDisposed()) return;
+            if (disconnected) {
+                // Re-assert the disconnected style: selecting the tab makes the
+                // CTabFolder repaint it with its own selection colours, which
+                // would otherwise wipe out the red indicator.
+                tabItem.setFont(getBoldTabFont());
+                tabItem.setForeground(getColorDisconnectedRed());
+            } else {
                 tabItem.setFont(null);
                 tabItem.setForeground(null);
             }
