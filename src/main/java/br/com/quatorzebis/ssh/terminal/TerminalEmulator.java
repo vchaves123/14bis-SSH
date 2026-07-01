@@ -471,6 +471,11 @@ public class TerminalEmulator {
     }
 
     private void deleteChars(int n) {
+        // Clamp to the remainder of the line — a remote-supplied count larger than
+        // (cols - cursorCol) would otherwise drive `cols - n` negative below and
+        // throw ArrayIndexOutOfBoundsException, killing the session.
+        n = Math.min(n, cols - cursorCol);
+        if (n <= 0) return;
         // Must use copyFrom (deep copy), not System.arraycopy (shallow reference copy).
         // arraycopy aliases cell objects, causing later writes to one cell to corrupt others.
         for (int c = cursorCol; c < cols - n; c++)

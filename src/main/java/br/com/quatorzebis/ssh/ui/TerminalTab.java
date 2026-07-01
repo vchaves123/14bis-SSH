@@ -682,6 +682,19 @@ public class TerminalTab {
                 logDir = Path.of(defaultDir);
             }
             br.com.quatorzebis.ssh.storage.SecureFiles.createDirectories(logDir);
+
+            // Re-check containment against the *real* (symlink/junction-resolved) path.
+            // The lexical startsWith() check above only compares normalized path text,
+            // so a symlink/NTFS junction planted under the home directory — e.g. via an
+            // imported *.session file with an unvalidated logDir — could otherwise point
+            // the actual write target outside the intended sandbox despite passing it.
+            Path realLogDir   = logDir.toRealPath();
+            Path realUserHome = userHome.toRealPath();
+            if (!realLogDir.startsWith(realUserHome)) {
+                logDir = Path.of(defaultDir);
+                br.com.quatorzebis.ssh.storage.SecureFiles.createDirectories(logDir);
+            }
+
             String ts       = LocalDateTime.now().format(LOG_TS);
             String baseName = (info.logFileName != null && !info.logFileName.isBlank())
                               ? info.logFileName.replaceAll("[^\\w\\-.]", "_")

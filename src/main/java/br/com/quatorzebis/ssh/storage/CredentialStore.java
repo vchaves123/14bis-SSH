@@ -86,9 +86,16 @@ public final class CredentialStore {
 
         this.salt      = fileSalt;
         this.masterKey = key;
-        String plainText = new String(plain, StandardCharsets.UTF_8);
+        // Decode straight to char[] — never materialize the whole plaintext vault
+        // (every saved password) as an immutable String, which can't be zeroed
+        // and would otherwise linger on the heap until GC.
+        char[] plainChars = bytesToChars(plain);
         Arrays.fill(plain, (byte) 0);
-        this.entries   = deserialize(plainText);
+        try {
+            this.entries = deserialize(plainChars);
+        } finally {
+            Arrays.fill(plainChars, '\0');
+        }
     }
 
     public void lock() {
@@ -130,7 +137,22 @@ public final class CredentialStore {
         byte[] iv    = randomBytes(IV_LEN);
         Cipher aes   = Cipher.getInstance("AES/GCM/NoPadding");
         aes.init(Cipher.ENCRYPT_MODE, masterKey, new GCMParameterSpec(128, iv));
-        byte[] ciph  = aes.doFinal(serialize(entries).getBytes(StandardCharsets.UTF_8));
+
+        // Serialize without ever forming one immutable String holding the whole
+        // plaintext vault (every saved password) — extract into a char[]/byte[]
+        // we can explicitly zero once the ciphertext has been produced.
+        StringBuilder sb = serialize(entries);
+        char[] plainChars = new char[sb.length()];
+        sb.getChars(0, sb.length(), plainChars, 0);
+        wipe(sb);
+        byte[] plainBytes = charsToBytes(plainChars);
+        Arrays.fill(plainChars, '\0');
+        byte[] ciph;
+        try {
+            ciph = aes.doFinal(plainBytes);
+        } finally {
+            Arrays.fill(plainBytes, (byte) 0);
+        }
 
         byte[] out = new byte[4 + 1 + SALT_LEN + IV_LEN + ciph.length];
         int off = 0;
@@ -147,7 +169,7 @@ public final class CredentialStore {
     // Serialization (plaintext inside the vault)
     // -----------------------------------------------------------------------
 
-    private static String serialize(List<CredentialEntry> list) {
+    private static StringBuilder serialize(List<CredentialEntry> list) {
         StringBuilder sb = new StringBuilder();
         for (CredentialEntry e : list) {
             sb.append("e.").append(e.id).append(".l=").append(esc(e.label))   .append('\n');
@@ -156,30 +178,89 @@ public final class CredentialStore {
             escChars(e.password, sb);
             sb.append('\n');
         }
-        return sb.toString();
+        return sb;
     }
 
-    private static List<CredentialEntry> deserialize(String text) {
+    /** Overwrites a StringBuilder's contents in place so no plaintext copy lingers in its backing array. */
+    private static void wipe(StringBuilder sb) {
+        for (int i = 0; i < sb.length(); i++) sb.setCharAt(i, '\0');
+        sb.setLength(0);
+    }
+
+    private static byte[] charsToBytes(char[] chars) {
+        java.nio.ByteBuffer bb = StandardCharsets.UTF_8.encode(java.nio.CharBuffer.wrap(chars));
+        byte[] out = new byte[bb.remaining()];
+        bb.get(out);
+        if (bb.hasArray()) Arrays.fill(bb.array(), (byte) 0);
+        return out;
+    }
+
+    private static char[] bytesToChars(byte[] bytes) {
+        java.nio.CharBuffer cb = StandardCharsets.UTF_8.decode(java.nio.ByteBuffer.wrap(bytes));
+        char[] out = new char[cb.remaining()];
+        cb.get(out);
+        if (cb.hasArray()) Arrays.fill(cb.array(), '\0');
+        return out;
+    }
+
+    /**
+     * Parses the serialized vault directly from a char[] — never wraps the whole
+     * plaintext (every saved password) in an immutable String. Only label/username
+     * (not secret) go through short-lived Strings; the password field is unescaped
+     * straight into a char[].
+     */
+    private static List<CredentialEntry> deserialize(char[] chars) {
         Map<String, CredentialEntry> map = new LinkedHashMap<>();
-        for (String line : text.split("\n")) {
-            line = line.trim();
-            if (line.isEmpty()) continue;
-            int eq = line.indexOf('=');
+        int i = 0, n = chars.length;
+        while (i < n) {
+            int lineStart = i;
+            while (i < n && chars[i] != '\n') i++;
+            int lineEnd = i;
+            if (i < n) i++; // skip '\n'
+
+            int s = lineStart, e = lineEnd;
+            while (s < e && Character.isWhitespace(chars[s])) s++;
+            while (e > s && Character.isWhitespace(chars[e - 1])) e--;
+            if (s >= e) continue;
+
+            int eq = -1;
+            for (int k = s; k < e; k++) { if (chars[k] == '=') { eq = k; break; } }
             if (eq < 0) continue;
-            String key = line.substring(0, eq);
-            String val = unesc(line.substring(eq + 1));
+
+            String key = new String(chars, s, eq - s);
             String[] p = key.split("\\.", 3);          // ["e", id, field]
             if (p.length != 3 || !"e".equals(p[0])) continue;
             CredentialEntry ce = map.computeIfAbsent(p[1], id -> {
                 CredentialEntry x = new CredentialEntry(); x.id = id; return x;
             });
+
+            int valStart = eq + 1, valEnd = e;
             switch (p[2]) {
-                case "l" -> ce.label    = val;
-                case "u" -> ce.username = val;
-                case "p" -> ce.password = val.toCharArray();
+                case "l" -> ce.label    = unesc(new String(chars, valStart, valEnd - valStart));
+                case "u" -> ce.username = unesc(new String(chars, valStart, valEnd - valStart));
+                case "p" -> ce.password = unescChars(chars, valStart, valEnd);
             }
         }
         return new ArrayList<>(map.values());
+    }
+
+    /** Single-pass unescape straight into a char[] — mirrors escChars()'s encoding exactly. */
+    private static char[] unescChars(char[] src, int start, int end) {
+        char[] out = new char[end - start];
+        int o = 0;
+        for (int i = start; i < end; i++) {
+            char c = src[i];
+            if (c == '\\' && i + 1 < end) {
+                char next = src[i + 1];
+                if (next == '\\' || next == 'n' || next == '=') {
+                    out[o++] = (next == 'n') ? '\n' : next;
+                    i++;
+                    continue;
+                }
+            }
+            out[o++] = c;
+        }
+        return o == out.length ? out : Arrays.copyOf(out, o);
     }
 
     /** Escape a String value for vault serialization. Order is critical: backslash first. */
