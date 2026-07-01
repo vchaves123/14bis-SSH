@@ -139,6 +139,10 @@ public class TerminalTab {
                 if (canvas.isDisposed()) return;
                 scrollOffset = 0;
                 updateScrollBar();
+                if (connection.isConnected()) {
+                    int c = emulator.getCols(), r = emulator.getRows();
+                    connection.updatePtySize(c, r, c * charWidth, r * charHeight);
+                }
                 canvas.redraw();
             })
         );
@@ -363,7 +367,11 @@ public class TerminalTab {
             int curRow  = emulator.getCursorRow();
             int curCol  = emulator.getCursorCol();
 
+            int rightMargin = cols * charWidth;
+            int bottomMargin = rows * charHeight;
+
             for (int r = 0; r < rows; r++) {
+                int rowBg = -1; // last non-cursor bg for right-margin fill
                 for (int c = 0; c < cols; c++) {
                     TerminalCell cell = emulator.getCell(r, c, scrollOffset);
                     if (cell == null) continue;
@@ -393,6 +401,7 @@ public class TerminalTab {
                         gc.setBackground(cbg);
                         gc.fillRectangle(px, py, charWidth, charHeight);
                         cbg.dispose();
+                        if (!isCursor) rowBg = bg; // don't leak cursor highlight into right margin
                     }
 
                     if (cell.character != ' ' && cell.character != '\0') {
@@ -416,6 +425,18 @@ public class TerminalTab {
                         if (cfg != null) cfg.dispose();
                     }
                 }
+                // Extend last cell's background into the fractional-column gap at the right.
+                if (rightMargin < area.width && rowBg >= 0) {
+                    Color cbg = swtRgb(rowBg);
+                    gc.setBackground(cbg);
+                    gc.fillRectangle(rightMargin, r * charHeight, area.width - rightMargin, charHeight);
+                    cbg.dispose();
+                }
+            }
+            // Fill fractional row gap at the bottom (already covered by initial fill, but be explicit)
+            if (bottomMargin < area.height) {
+                gc.setBackground(defaultBg);
+                gc.fillRectangle(0, bottomMargin, area.width, area.height - bottomMargin);
             }
             // ── Selection highlight overlay ──────────────────────────────
             if (selAnchorCol >= 0 && hasSelection()) {

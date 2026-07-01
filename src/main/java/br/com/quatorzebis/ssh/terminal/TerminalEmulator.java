@@ -93,6 +93,7 @@ public class TerminalEmulator {
     private boolean appCursorKeys  = false;
     private boolean cursorVisible  = true;
     private boolean altBufferActive = false;
+    private int     altBufferDepth  = 0;   // nesting counter for apps that stack alt-screen
 
     // -----------------------------------------------------------------------
     // UTF-8 incremental decoder
@@ -417,6 +418,7 @@ public class TerminalEmulator {
         for (TerminalCell[] row : alternateBuffer) for (TerminalCell c : row) c.clear();
         scrollback.clear();
         if (altBufferActive) { altBufferActive = false; activeBuffer = primaryBuffer; }
+        altBufferDepth = 0;
         resetState();
     }
 
@@ -469,10 +471,11 @@ public class TerminalEmulator {
     }
 
     private void deleteChars(int n) {
-        int end = Math.min(cols, cursorCol + n);
-        System.arraycopy(activeBuffer[cursorRow], end,
-                         activeBuffer[cursorRow], cursorCol, cols - end);
-        for (int c = cols - n; c < cols; c++) activeBuffer[cursorRow][c].clear();
+        // Must use copyFrom (deep copy), not System.arraycopy (shallow reference copy).
+        // arraycopy aliases cell objects, causing later writes to one cell to corrupt others.
+        for (int c = cursorCol; c < cols - n; c++)
+            activeBuffer[cursorRow][c].copyFrom(activeBuffer[cursorRow][c + n]);
+        for (int c = cols - n; c < cols; c++) eraseCell(activeBuffer[cursorRow][c]);
     }
 
     private void eraseChars(int n) {
@@ -484,7 +487,7 @@ public class TerminalEmulator {
         for (int c = cols - 1; c >= cursorCol + n; c--)
             activeBuffer[cursorRow][c].copyFrom(activeBuffer[cursorRow][c - n]);
         for (int c = cursorCol; c < cursorCol + n && c < cols; c++)
-            activeBuffer[cursorRow][c].clear();
+            eraseCell(activeBuffer[cursorRow][c]);
     }
 
     private void scrollUp(int n)   { scrollRegion(n); }
@@ -548,7 +551,18 @@ public class TerminalEmulator {
     // Alternate screen buffer
     // -----------------------------------------------------------------------
     private void activateAltBuffer(boolean saveState) {
-        if (altBufferActive) return;
+        altBufferDepth++;
+        if (altBufferActive) {
+            // Nested activation (e.g. YaST inside MC): just clear the alt buffer
+            // so the inner app gets a clean slate. Don't touch the saved primary state.
+            for (TerminalCell[] row : alternateBuffer) for (TerminalCell c : row) c.clear();
+            cursorRow = 0; cursorCol = 0; wrapPending = false;
+            scrollTop = 0; scrollBottom = rows - 1;
+            g0LineDrawing = false; g1LineDrawing = false; useG1 = false;
+            currentAttrs.clear();
+            notifyAltBufferChanged();
+            return;
+        }
         if (saveState) {
             altSavedRow          = cursorRow;
             altSavedCol          = cursorCol;
@@ -572,6 +586,31 @@ public class TerminalEmulator {
 
     private void deactivateAltBuffer(boolean restoreState) {
         if (!altBufferActive) return;
+        if (altBufferDepth > 1) {
+            // Nested deactivation (inner app like YaST exiting): stay in alt buffer.
+            // Do NOT clear the alt buffer here. ncurses in the outer app (MC) holds
+            // its own physical-screen model that reflects whatever the inner app drew.
+            // MC will do a differential update from that state — only changing cells
+            // that differ. If we cleared the buffer, cells that ncurses thinks are
+            // already correct would never be redrawn, leaving blank/corrupt cells.
+            // Leaving the inner app's content intact lets the differential update work.
+            altBufferDepth--;
+            if (restoreState) {
+                cursorRow = altSavedRow; cursorCol = altSavedCol;
+                scrollTop = altSavedScrollTop; scrollBottom = altSavedScrollBottom;
+                g0LineDrawing = altSavedG0LineDrawing; g1LineDrawing = altSavedG1LineDrawing;
+                useG1 = altSavedUseG1; appCursorKeys = altSavedAppCursorKeys;
+                currentAttrs.copyFrom(altSavedAttrs);
+            } else {
+                scrollTop = 0; scrollBottom = rows - 1;
+                g0LineDrawing = false; g1LineDrawing = false; useG1 = false;
+                currentAttrs.clear();
+            }
+            wrapPending = false;
+            notifyAltBufferChanged();
+            return;
+        }
+        altBufferDepth = 0;
         altBufferActive = false;
         activeBuffer    = primaryBuffer;
         if (restoreState) {
@@ -585,7 +624,6 @@ public class TerminalEmulator {
             appCursorKeys = altSavedAppCursorKeys;
             currentAttrs.copyFrom(altSavedAttrs);
         } else {
-            // partial restore: at minimum reset scroll region and charset
             scrollTop = 0; scrollBottom = rows - 1;
             g0LineDrawing = false; g1LineDrawing = false; useG1 = false;
             currentAttrs.clear();
@@ -674,7 +712,8 @@ public class TerminalEmulator {
 
     private void clearLineRange(int row, int colStart, int colEnd) {
         if (row < 0 || row >= rows) return;
-        for (int c = colStart; c < colEnd && c < cols; c++) eraseCell(activeBuffer[row][c]);
+        for (int c = colStart; c < colEnd && c < cols; c++)
+            eraseCell(activeBuffer[row][c]);
     }
 
     /**

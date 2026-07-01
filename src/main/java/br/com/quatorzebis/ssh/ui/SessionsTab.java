@@ -27,7 +27,7 @@ public class SessionsTab {
     private final SessionTreePanel treePanel;
 
     public SessionsTab(CTabFolder folder, Shell shell,
-                       Consumer<SessionInfo> onConnect, Runnable onNewSession,
+                       Consumer<SessionInfo> onConnect,
                        Runnable onCredentials, Runnable onAbout) {
 
         tabItem = new CTabItem(folder, SWT.NONE);   // no close button
@@ -109,12 +109,10 @@ public class SessionsTab {
         rl.spacing = 12; rl.marginWidth = 0; rl.marginHeight = 0;
         btnRow.setLayout(rl);
 
-        Button btnNew      = new Button(btnRow, SWT.PUSH); btnNew.setText("  + New Session  ");
         Button btnCreds    = new Button(btnRow, SWT.PUSH); btnCreds.setText("  Credential Manager  ");
         Button btnAppear   = new Button(btnRow, SWT.PUSH); btnAppear.setText("  Default Appearance  ");
         Button btnAbout    = new Button(btnRow, SWT.PUSH); btnAbout.setText("  About  ");
 
-        btnNew.addListener(SWT.Selection,    e -> onNewSession.run());
         btnCreds.addListener(SWT.Selection,  e -> onCredentials.run());
         btnAbout.addListener(SWT.Selection,  e -> onAbout.run());
         btnAppear.addListener(SWT.Selection, e -> {

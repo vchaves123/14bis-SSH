@@ -1,5 +1,6 @@
 package br.com.quatorzebis.ssh.ui;
 
+import br.com.quatorzebis.ssh.BuildInfo;
 import br.com.quatorzebis.ssh.model.SessionInfo;
 import br.com.quatorzebis.ssh.storage.CredentialStore;
 import org.eclipse.swt.SWT;
@@ -44,7 +45,7 @@ public class MainWindow {
     // -----------------------------------------------------------------------
     public void open() {
         shell = new Shell(display, SWT.SHELL_TRIM);
-        shell.setText("14bis SSH");
+        shell.setText("14bis SSH  [build #" + BuildInfo.BUILD + "]");
         shell.setLayout(new FillLayout());
         shell.setSize(1000, 650);
         centerOnScreen();
@@ -123,7 +124,7 @@ public class MainWindow {
 
         // Create the permanent Sessions tab
         sessionsTab = new SessionsTab(tabFolder, shell, this::openTerminal,
-                this::newSession, this::openCredentialManager, this::showAbout);
+                this::openCredentialManager, this::showAbout);
         tabFolder.setSelection(sessionsTab.getTabItem());
     }
 

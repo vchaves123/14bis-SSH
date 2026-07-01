@@ -84,12 +84,6 @@ public class WelcomeTab {
 
         spacer(root, 32);
 
-        // "New Session" button
-        Button btn = new Button(root, SWT.PUSH);
-        btn.setText("  + New Session  ");
-        btn.setLayoutData(new GridData(SWT.CENTER, SWT.CENTER, true, false));
-        btn.addListener(SWT.Selection, e -> onNewSession.run());
-
         // Filler to push version label to the bottom
         Label filler = new Label(root, SWT.NONE);
         filler.setBackground(display.getSystemColor(SWT.COLOR_BLACK));
