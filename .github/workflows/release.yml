@@ -45,6 +45,14 @@ jobs:
       - name: Build fat JAR
         run: mvn package -P ${{ matrix.mvn-profile }} -B -q
 
+      - name: Get version info
+        id: ver
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME:-v0.0.0}"
+          echo "app=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "jar=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout -B)" >> "$GITHUB_OUTPUT"
+
       - name: Convert icon to ICO (Windows)
         if: matrix.runner == 'windows-latest'
         shell: pwsh
@@ -92,10 +100,10 @@ jobs:
           jpackage ^
             --input target ^
             --name "14bis SSH" ^
-            --main-jar 14bis-ssh-1.0.0.jar ^
+            --main-jar 14bis-ssh-${{ steps.ver.outputs.jar }}.jar ^
             --main-class br.com.quatorzebis.ssh.Main ^
             --type exe ^
-            --app-version 1.0.0 ^
+            --app-version ${{ steps.ver.outputs.app }} ^
             --vendor "Molho Ltda." ^
             --copyright "Copyright (C) 2026 Vicente Melo - Molho Ltda." ^
             --description "Lightweight SSH terminal client" ^
@@ -111,10 +119,10 @@ jobs:
           jpackage \
             --input target \
             --name "ssh-14bis" \
-            --main-jar 14bis-ssh-1.0.0.jar \
+            --main-jar 14bis-ssh-${{ steps.ver.outputs.jar }}.jar \
             --main-class br.com.quatorzebis.ssh.Main \
             --type deb \
-            --app-version 1.0.0 \
+            --app-version ${{ steps.ver.outputs.app }} \
             --vendor "Molho Ltda." \
             --copyright "Copyright (C) 2026 Vicente Melo - Molho Ltda." \
             --description "Lightweight SSH terminal client" \
@@ -139,10 +147,10 @@ jobs:
           jpackage \
             --input target \
             --name "14bis SSH" \
-            --main-jar 14bis-ssh-1.0.0.jar \
+            --main-jar 14bis-ssh-${{ steps.ver.outputs.jar }}.jar \
             --main-class br.com.quatorzebis.ssh.Main \
             --type dmg \
-            --app-version 1.0.0 \
+            --app-version ${{ steps.ver.outputs.app }} \
             --vendor "Molho Ltda." \
             --copyright "Copyright (C) 2026 Vicente Melo - Molho Ltda." \
             --description "Lightweight SSH terminal client" \
