@@ -47,6 +47,8 @@ public final class SessionStorage {
         p.setProperty("appearFontSize", String.valueOf(s.appearFontSize));
         p.setProperty("appearFg", s.appearFgR + "," + s.appearFgG + "," + s.appearFgB);
         p.setProperty("appearBg", s.appearBgR + "," + s.appearBgG + "," + s.appearBgB);
+        p.setProperty("logEnabled", String.valueOf(s.logEnabled));
+        p.setProperty("logDir",     s.logDir != null ? s.logDir : "");
 
         try (OutputStream out = Files.newOutputStream(dir.resolve(s.fileName()))) {
             p.store(out, "14bis SSH session");
@@ -137,6 +139,8 @@ public final class SessionStorage {
         s.appearFgR = fg[0]; s.appearFgG = fg[1]; s.appearFgB = fg[2];
         int[] bg = parseRgb(p.getProperty("appearBg", "0,0,0"));
         s.appearBgR = bg[0]; s.appearBgG = bg[1]; s.appearBgB = bg[2];
+        s.logEnabled = Boolean.parseBoolean(p.getProperty("logEnabled", "false"));
+        s.logDir     = p.getProperty("logDir", "");
         String at        = p.getProperty("authType", "PASSWORD");
         try { s.authType = SessionInfo.AuthType.valueOf(at); }
         catch (IllegalArgumentException e) { s.authType = SessionInfo.AuthType.PASSWORD; }

@@ -17,7 +17,13 @@ import org.eclipse.swt.widgets.*;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 /**
  * A single terminal tab backed by an SSH connection.
@@ -93,6 +99,12 @@ public class TerminalTab {
 
     /** Pending debounced resize runnable; cancelled and rescheduled on every SWT.Resize event. */
     private Runnable pendingResize;
+
+    // -----------------------------------------------------------------------
+    // Logging
+    // -----------------------------------------------------------------------
+    private OutputStream logStream;
+    private static final DateTimeFormatter LOG_TS = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
 
     // -----------------------------------------------------------------------
     // Constructor
@@ -649,9 +661,40 @@ public class TerminalTab {
         t.start();
     }
 
+    private void openLogFile(SessionInfo info) {
+        if (!info.logEnabled) return;
+        try {
+            String dir = (info.logDir != null && !info.logDir.isBlank())
+                         ? info.logDir
+                         : System.getProperty("user.home") + "/.ssh/log";
+            Path logDir = Path.of(dir);
+            Files.createDirectories(logDir);
+            String ts   = LocalDateTime.now().format(LOG_TS);
+            String host = info.host.replaceAll("[^\\w\\-.]", "_");
+            Path   file = logDir.resolve(ts + "_" + host + ".log");
+            logStream = Files.newOutputStream(file,
+                StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            logStream = null;
+        }
+    }
+
+    private void writeLog(byte[] buf, int len) {
+        if (logStream == null) return;
+        try { logStream.write(buf, 0, len); logStream.flush(); }
+        catch (IOException ignored) { logStream = null; }
+    }
+
+    private void closeLog() {
+        if (logStream == null) return;
+        try { logStream.close(); } catch (IOException ignored) {}
+        logStream = null;
+    }
+
     private void runSsh(SessionInfo info, String password) {
         try {
             connection.connect(info, password);
+            openLogFile(info);
             display.asyncExec(() -> {
                 if (!canvas.isDisposed()) { updateTerminalSize(); canvas.setFocus(); }
             });
@@ -676,12 +719,14 @@ public class TerminalTab {
             byte[]      buf = new byte[4096];
             int         n;
             while (!closed && (n = in.read(buf)) != -1) {
+                writeLog(buf, n);
                 emulator.processBytes(buf, 0, n);
                 emulator.flushResponses();
                 if (n > 3) notifyActivity();
             }
         } catch (IOException ignored) {
         } finally {
+            closeLog();
             connection.close();
             if (!closed) handleDisconnect();
         }
@@ -983,6 +1028,7 @@ public class TerminalTab {
         closed = true;
         if (altFilter  != null) display.removeFilter(SWT.KeyDown, altFilter);
         if (fKeyFilter != null) display.removeFilter(SWT.KeyDown, fKeyFilter);
+        closeLog();
         connection.close();
         display.asyncExec(() -> {
             disposeOffscreen();

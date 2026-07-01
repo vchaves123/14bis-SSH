@@ -128,6 +128,38 @@ public class SessionDialog {
         cmbCred.addListener(SWT.FocusIn, e -> { if (!store.isUnlocked()) loadCreds.run(); });
         btnNewCred.addListener(SWT.Selection, e -> { new CredentialManagerDialog(dlg).open(); loadCreds.run(); });
 
+        // ── Logging ───────────────────────────────────────────────────────────
+        label(dlg, "Log output:");
+        Composite cmpLog = new Composite(dlg, SWT.NONE);
+        cmpLog.setLayoutData(fill());
+        GridLayout glLog = new GridLayout(3, false);
+        glLog.marginWidth = 0; glLog.marginHeight = 0; glLog.horizontalSpacing = 6;
+        cmpLog.setLayout(glLog);
+
+        Button chkLog = new Button(cmpLog, SWT.CHECK);
+        chkLog.setText("Enable");
+
+        Text txtLogDir = new Text(cmpLog, SWT.BORDER | SWT.READ_ONLY);
+        txtLogDir.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        txtLogDir.setToolTipText("Directory where log files will be saved");
+
+        Button btnLogBrowse = new Button(cmpLog, SWT.PUSH);
+        btnLogBrowse.setText("…");
+
+        String defaultLogDir = System.getProperty("user.home") + "/.ssh/log";
+        txtLogDir.setText(defaultLogDir);
+
+        chkLog.addListener(SWT.Selection, e -> txtLogDir.setEnabled(chkLog.getSelection()));
+        txtLogDir.setEnabled(false);
+
+        btnLogBrowse.addListener(SWT.Selection, e -> {
+            DirectoryDialog dd = new DirectoryDialog(dlg, SWT.NONE);
+            dd.setText("Select log directory");
+            dd.setFilterPath(txtLogDir.getText());
+            String chosen = dd.open();
+            if (chosen != null) txtLogDir.setText(chosen);
+        });
+
         // ── Appearance ────────────────────────────────────────────────────────
         label(dlg, "Appearance:");
         Composite cmpAppear = new Composite(dlg, SWT.NONE);
@@ -253,6 +285,12 @@ public class SessionDialog {
                 if (idx >= 0) cmbGroup.select(idx);
             }
         }
+        if (editing != null) {
+            chkLog.setSelection(editing.logEnabled);
+            if (editing.logDir != null && !editing.logDir.isBlank())
+                txtLogDir.setText(editing.logDir);
+            txtLogDir.setEnabled(editing.logEnabled);
+        }
         updateAuth.run();
         dlg.pack();
         dlg.setSize(Math.max(dlg.getSize().x, 460), dlg.getSize().y);
@@ -294,6 +332,8 @@ public class SessionDialog {
             s.appearFontSize = appFontSize[0];
             s.appearFgR = appFg[0]; s.appearFgG = appFg[1]; s.appearFgB = appFg[2];
             s.appearBgR = appBg[0]; s.appearBgG = appBg[1]; s.appearBgB = appBg[2];
+            s.logEnabled = chkLog.getSelection();
+            s.logDir     = txtLogDir.getText().trim();
 
             try { SessionStorage.save(s); result = s; dlg.dispose(); }
             catch (IOException ex) { alert(dlg, "Failed to save session:\n" + ex.getMessage()); }
