@@ -163,42 +163,76 @@ public final class SessionImporter {
         List<SessionInfo> out = new ArrayList<>();
         if (iniFile == null || !Files.isRegularFile(iniFile)) return out;
 
+        String content;
+        try { content = readTextAutoDetect(iniFile); }
+        catch (IOException e) { return out; }
+
+        // MobaXterm puts each subfolder's bookmarks in its own numbered section
+        // ([Bookmarks], [Bookmarks_1], [Bookmarks_2], ...); SubRep names the subfolder.
         boolean inBookmarks = false;
-        try (BufferedReader r = Files.newBufferedReader(iniFile, StandardCharsets.UTF_8)) {
-            String line;
-            while ((line = r.readLine()) != null) {
-                line = line.strip();
-                if (line.isEmpty()) continue;
-                if (line.startsWith("[")) {
-                    inBookmarks = line.equalsIgnoreCase("[Bookmarks]");
-                    continue;
-                }
-                if (!inBookmarks) continue;
-
-                int eq = line.indexOf('=');
-                if (eq <= 0) continue;
-                String name  = line.substring(0, eq).trim();
-                String value = line.substring(eq + 1).trim();
-                if (name.equalsIgnoreCase("SubRep") || name.equalsIgnoreCase("ImgNum")) continue;
-
-                // SSH bookmarks start with "#109#" (MobaXterm's internal session-type code).
-                if (!value.startsWith("#109#")) continue;
-                String[] fields = value.split("%");
-                // fields[0] = "#109#0"; host/port/username follow at fixed positions.
-                if (fields.length < 4) continue;
-
-                SessionInfo s = new SessionInfo();
-                s.name     = name;
-                s.host     = fields[1].trim();
-                s.port     = parseIntSafe(fields[2].trim(), 22);
-                s.username = fields[3].trim();
-                if (s.host.isBlank()) continue;
-                s.authType = SessionInfo.AuthType.PASSWORD;
-                s.group    = "Imported (MobaXterm)";
-                out.add(s);
+        String subfolder = "";
+        for (String rawLine : content.split("\\R")) {
+            String line = rawLine.strip();
+            if (line.isEmpty()) continue;
+            if (line.startsWith("[")) {
+                inBookmarks = line.toLowerCase(Locale.ROOT).startsWith("[bookmarks");
+                subfolder = "";
+                continue;
             }
-        } catch (IOException ignored) {}
+            if (!inBookmarks) continue;
+
+            int eq = line.indexOf('=');
+            if (eq <= 0) continue;
+            String name  = line.substring(0, eq).trim();
+            String value = line.substring(eq + 1).trim();
+            if (name.equalsIgnoreCase("ImgNum")) continue;
+            if (name.equalsIgnoreCase("SubRep")) { subfolder = value; continue; }
+
+            // SSH bookmarks start with "#109#" (MobaXterm's internal session-type code).
+            if (!value.startsWith("#109#")) continue;
+            String[] fields = value.split("%");
+            // fields[0] = "#109#0"; host/port/username follow at fixed positions.
+            if (fields.length < 4) continue;
+
+            SessionInfo s = new SessionInfo();
+            s.name     = name;
+            s.host     = fields[1].trim();
+            s.port     = parseIntSafe(fields[2].trim(), 22);
+            s.username = fields[3].trim();
+            if (s.host.isBlank()) continue;
+            s.authType = SessionInfo.AuthType.PASSWORD;
+            s.group    = subfolder.isBlank() ? "Imported (MobaXterm)" : "Imported (MobaXterm) - " + subfolder;
+            out.add(s);
+        }
         return out;
+    }
+
+    /**
+     * Reads a text file whose encoding isn't known in advance: honours a UTF-8/UTF-16
+     * BOM if present, otherwise uses UTF-8 only if the bytes are valid UTF-8, falling
+     * back to Windows-1252 (the common encoding for legacy Windows .ini files) so
+     * structural ASCII delimiters ('[', '=', '%') are never misread.
+     */
+    private static String readTextAutoDetect(Path file) throws IOException {
+        byte[] bytes = Files.readAllBytes(file);
+        if (bytes.length >= 3 && (bytes[0] & 0xFF) == 0xEF && (bytes[1] & 0xFF) == 0xBB && (bytes[2] & 0xFF) == 0xBF) {
+            return new String(bytes, 3, bytes.length - 3, StandardCharsets.UTF_8);
+        }
+        if (bytes.length >= 2 && (bytes[0] & 0xFF) == 0xFF && (bytes[1] & 0xFF) == 0xFE) {
+            return new String(bytes, 2, bytes.length - 2, StandardCharsets.UTF_16LE);
+        }
+        if (bytes.length >= 2 && (bytes[0] & 0xFF) == 0xFE && (bytes[1] & 0xFF) == 0xFF) {
+            return new String(bytes, 2, bytes.length - 2, StandardCharsets.UTF_16BE);
+        }
+        try {
+            StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+                .decode(java.nio.ByteBuffer.wrap(bytes));
+            return new String(bytes, StandardCharsets.UTF_8);
+        } catch (java.nio.charset.CharacterCodingException notUtf8) {
+            return new String(bytes, java.nio.charset.Charset.forName("windows-1252"));
+        }
     }
 
     private static int parseIntSafe(String s, int def) {
