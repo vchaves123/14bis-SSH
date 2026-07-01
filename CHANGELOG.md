@@ -1,0 +1,99 @@
+# Changelog
+
+All notable changes to 14bis SSH are documented here.  
+Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+---
+
+## [1.0.4] — 2026-07-01
+
+### Added
+- Windows installer now detects a previously installed version and offers to uninstall it before
+  installing the new one (WiX `UpgradeCode` / `--win-upgrade-uuid`).
+- Automatic Windows code-signing via GitHub Actions: when the `CODE_SIGN_CERT_BASE64` and
+  `CODE_SIGN_PASSWORD` repository secrets are present the installer is signed with `signtool.exe`
+  using SHA-256 and a Sectigo RFC 3161 timestamp.
+- `SIGNING.md` — instructions for configuring a PFX certificate or applying for a free
+  [SignPath Foundation](https://signpath.io/code-signing-for-open-source/) certificate.
+- README: "Code signing" section mentioning SignPath Foundation.
+
+### Fixed
+- `run.bat`: JAR path resolved by glob **after** `mvn clean package` — the previous version
+  resolved the glob before the build, so a clean workspace reported "Unable to access jarfile".
+
+---
+
+## [1.0.3] — 2026-06-30
+
+### Added
+- GitHub Actions workflow: version is now derived dynamically from the git tag and Maven POM
+  (`mvn help:evaluate`) — no more hardcoded version string in the jpackage command.
+
+### Fixed
+- Second security audit — four additional issues resolved:
+  - `StrictHostKeyChecking` changed from `"no"` to `"ask"`; unknown host fingerprints now show
+    a confirmation dialog instead of being accepted silently.
+  - Path-traversal check added to `TerminalTab.openLogFile`: the configured log directory is
+    validated to be under `user.home` before any file is created.
+  - `SecureFiles` utility: all application files and directories now created with owner-only
+    permissions (`rw-------` / `rwx------` on POSIX; Windows equivalent via `setReadable/Writable`).
+  - `CredentialStore.deriveKey`: `PBEKeySpec.clearPassword()` is now called in a `finally` block
+    so the password char array is zeroed even when key derivation throws.
+- Version numbers in `BuildInfo.java` and `pom.xml` were out of sync with the GitHub release tag;
+  all three are now kept aligned.
+- `run.bat`: JAR filename detected by glob (`14bis-ssh-*.jar`) instead of a hardcoded version
+  string — the script no longer breaks after a version bump.
+
+---
+
+## [1.0.2] — 2026-06-28
+
+### Fixed
+- First security audit — three critical and one high-severity issue resolved:
+  - **Critical — password stored as `String`**: `CredentialEntry.password` changed from `String`
+    to `char[]`; passwords are zeroed with `Arrays.fill` as soon as they are no longer needed.
+    `SWT Text.getTextChars()` is used everywhere to avoid creating temporary `String` objects.
+  - **Critical — SSH password passed as `String`**: `SshConnection.connect` now accepts
+    `char[]`; the password is encoded to a UTF-8 `byte[]` via `CharBuffer`, passed to JSch,
+    and the byte array is zeroed immediately after use.
+  - **Critical — vault serialization created `String` from password**: `CredentialStore` now
+    serializes passwords character-by-character with `escChars(char[], StringBuilder)`, avoiding
+    any `String` representation.
+  - **High — application files world-readable**: log, session, vault, and settings files are now
+    created with `SecureFiles` (owner-only permissions; atomic write via temp-file + `ATOMIC_MOVE`).
+
+---
+
+## [1.0.1] — 2026-06-27
+
+_No code changes — tag created to mark the first publicly announced release._
+
+---
+
+## [1.0.0] — 2026-06-27
+
+### Added
+- **App icon** in native installers: `IconExporter` renders the application icon using AWT at
+  multiple sizes (16, 32, 48, 128, 256 px) during the Maven `prepare-package` phase.
+  GitHub Actions converts the PNG to ICO (Windows) and ICNS (macOS) before calling jpackage.
+- Sessions tab no longer has a close button; terminal tabs keep their individual close (×) button.
+- GitHub Actions release workflow builds native installers for Windows (`.exe`), Linux (`.deb`),
+  and macOS (`.dmg`) in parallel with `fail-fast: false`.
+- Linux package renamed to `ssh-14bis` (jpackage DEB validator requires names that start with a
+  letter, not a digit).
+
+### Changed
+- Session groups can be organised in the sessions panel.
+- Terminal appearance (font, foreground colour, background colour) is configurable per session.
+
+---
+
+## Earlier builds (pre-release, builds 1 – 46)
+
+| Build range | Notable additions |
+|-------------|-------------------|
+| 37 – 46     | Session logging (plain text, ANSI stripped); single persistent `app.log`; log toggle in tab context menu |
+| 30 – 36     | Credential manager with AES-256 vault protected by master password; session groups; `PasswordField` with visibility toggle |
+| 20 – 29     | Scrollback buffer; mouse selection & copy; activity indicator (blinking dot on background tabs) |
+| 10 – 19     | xterm-256color emulator: colour, bold, underline, reverse; alt-buffer (mc / vim) |
+| 1 – 9       | Initial SSH terminal with tabbed interface; session manager; private-key authentication |
