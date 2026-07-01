@@ -1,6 +1,5 @@
 package br.com.quatorzebis.ssh.ui;
 
-import br.com.quatorzebis.ssh.BuildInfo;
 import br.com.quatorzebis.ssh.model.SessionInfo;
 import br.com.quatorzebis.ssh.storage.CredentialStore;
 import org.eclipse.swt.SWT;
@@ -45,7 +44,7 @@ public class MainWindow {
     // -----------------------------------------------------------------------
     public void open() {
         shell = new Shell(display, SWT.SHELL_TRIM);
-        shell.setText("14bis SSH  [build #" + BuildInfo.BUILD + "]");
+        shell.setText("14bis SSH");
         shell.setLayout(new FillLayout());
         shell.setSize(1000, 650);
         centerOnScreen();

@@ -139,13 +139,34 @@ public class CredentialManagerDialog {
         Text txtUser = txt(dlg);
 
         lbl(dlg, "Password:");
-        Text txtPass = new Text(dlg, SWT.BORDER | SWT.PASSWORD);
-        txtPass.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        Composite cmpPass = new Composite(dlg, SWT.NONE);
+        cmpPass.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        GridLayout glPass = new GridLayout(2, false);
+        glPass.marginWidth = 0; glPass.marginHeight = 0; glPass.horizontalSpacing = 4;
+        cmpPass.setLayout(glPass);
+        final Text[] txtPass_ref = {new Text(cmpPass, SWT.BORDER | SWT.PASSWORD)};
+        txtPass_ref[0].setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        Button btnEye = new Button(cmpPass, SWT.PUSH);
+        btnEye.setText("👁");
+        btnEye.setToolTipText("Show / hide password");
+        btnEye.addListener(SWT.Selection, ev -> {
+            boolean hidden = (txtPass_ref[0].getStyle() & SWT.PASSWORD) != 0;
+            String current = txtPass_ref[0].getText();
+            GridData gd = (GridData) txtPass_ref[0].getLayoutData();
+            txtPass_ref[0].dispose();
+            Text replacement = new Text(cmpPass, SWT.BORDER | (hidden ? SWT.NONE : SWT.PASSWORD));
+            replacement.setLayoutData(gd);
+            replacement.moveAbove(btnEye);
+            replacement.setText(current);
+            replacement.setSelection(current.length());
+            cmpPass.layout(true, true);
+            txtPass_ref[0] = replacement;
+        });
 
         if (existing != null) {
             txtLabel.setText(existing.label);
             txtUser.setText(existing.username);
-            txtPass.setText(existing.password);
+            txtPass_ref[0].setText(existing.password);
         }
 
         new Label(dlg, SWT.NONE);
@@ -167,7 +188,7 @@ public class CredentialManagerDialog {
             CredentialEntry ce = existing != null ? existing : new CredentialEntry();
             ce.label    = txtLabel.getText().trim();
             ce.username = user;
-            ce.password = txtPass.getText();
+            ce.password = txtPass_ref[0].getText();
             result[0]   = ce;
             dlg.dispose();
         });
