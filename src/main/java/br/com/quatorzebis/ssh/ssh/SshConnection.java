@@ -72,7 +72,9 @@ public class SshConnection {
         session.connect(15_000);
 
         channel = (ChannelShell) session.openChannel("shell");
-        channel.setPtyType("xterm-256color");
+        String ptyType = (info.terminalType != null && !info.terminalType.isBlank())
+            ? info.terminalType : "xterm-256color";
+        channel.setPtyType(ptyType);
         channel.setPtySize(80, 24, 640, 480);
 
         input  = channel.getInputStream();

@@ -559,7 +559,7 @@ public class TerminalTab {
         if (key == SWT.INSERT)    return bytes("\033[2~");
         if (key == SWT.DEL)       return bytes("\033[3~");
 
-        if (ch == SWT.BS || key == SWT.BS) return new byte[]{ (byte) 0x7F };
+        if (ch == SWT.BS || key == SWT.BS) return new byte[]{ (byte) sessionInfo.backspaceCode };
         if (ch == '\r')  return new byte[]{ '\r' };
         // Shift+Tab → Back-Tab (ESC[Z); must be checked before plain Tab
         if (key == SWT.TAB && (e.stateMask & SWT.SHIFT) != 0) return bytes("\033[Z");

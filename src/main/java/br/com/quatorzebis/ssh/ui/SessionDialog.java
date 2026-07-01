@@ -232,6 +232,20 @@ public class SessionDialog {
             }
         });
 
+        // ── Terminal type / Backspace key ────────────────────────────────────
+        label(dlg, "Terminal type:");
+        Combo cmbTermType = new Combo(dlg, SWT.DROP_DOWN);
+        cmbTermType.setLayoutData(fill());
+        cmbTermType.setItems("xterm-256color", "xterm", "vt100", "ansi", "linux");
+        cmbTermType.setText(editing != null && editing.terminalType != null && !editing.terminalType.isBlank()
+            ? editing.terminalType : "xterm-256color");
+
+        label(dlg, "Backspace key:");
+        Combo cmbBackspace = new Combo(dlg, SWT.DROP_DOWN | SWT.READ_ONLY);
+        cmbBackspace.setLayoutData(fill());
+        cmbBackspace.setItems("DEL (0x7F) — Linux and most systems", "BS (0x08) — AIX");
+        cmbBackspace.select((editing != null && editing.backspaceCode == 0x08) ? 1 : 0);
+
         // ── Buttons ───────────────────────────────────────────────────────────
         new Label(dlg, SWT.NONE);
         Composite cmpBtns = new Composite(dlg, SWT.NONE);
@@ -358,6 +372,10 @@ public class SessionDialog {
             s.logEnabled  = chkLog.getSelection();
             s.logDir      = txtLogDir.getText().trim();
             s.logFileName = txtLogFileName.getText().trim();
+
+            String termType = cmbTermType.getText().trim();
+            s.terminalType  = termType.isEmpty() ? "xterm-256color" : termType;
+            s.backspaceCode = cmbBackspace.getSelectionIndex() == 1 ? 0x08 : 0x7F;
 
             try { SessionStorage.save(s); result = s; dlg.dispose(); }
             catch (IOException ex) { alert(dlg, "Failed to save session:\n" + ex.getMessage()); }

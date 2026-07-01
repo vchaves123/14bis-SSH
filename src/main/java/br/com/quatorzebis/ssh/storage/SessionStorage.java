@@ -51,6 +51,8 @@ public final class SessionStorage {
         p.setProperty("logEnabled",  String.valueOf(s.logEnabled));
         p.setProperty("logDir",      s.logDir      != null ? s.logDir      : "");
         p.setProperty("logFileName", s.logFileName  != null ? s.logFileName : "");
+        p.setProperty("terminalType",  s.terminalType != null && !s.terminalType.isBlank() ? s.terminalType : "xterm-256color");
+        p.setProperty("backspaceCode", String.valueOf(s.backspaceCode));
 
         Path file = dir.resolve(s.fileName());
         try (OutputStream out = SecureFiles.openAppend(file)) {
@@ -152,6 +154,9 @@ public final class SessionStorage {
         s.logEnabled  = Boolean.parseBoolean(p.getProperty("logEnabled", "false"));
         s.logDir      = p.getProperty("logDir",      "");
         s.logFileName = p.getProperty("logFileName", "");
+        s.terminalType  = p.getProperty("terminalType", "xterm-256color");
+        s.backspaceCode = parseInt(p.getProperty("backspaceCode", "127"));
+        if (s.backspaceCode != 0x08 && s.backspaceCode != 0x7F) s.backspaceCode = 0x7F;
         String at        = p.getProperty("authType", "PASSWORD");
         try { s.authType = SessionInfo.AuthType.valueOf(at); }
         catch (IllegalArgumentException e) { s.authType = SessionInfo.AuthType.PASSWORD; }
