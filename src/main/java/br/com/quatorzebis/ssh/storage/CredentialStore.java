@@ -140,8 +140,7 @@ public final class CredentialStore {
         System.arraycopy(iv,     0, out, off, IV_LEN);   off += IV_LEN;
         System.arraycopy(ciph,   0, out, off, ciph.length);
 
-        Files.createDirectories(VAULT.getParent());
-        Files.write(VAULT, out);
+        SecureFiles.write(VAULT, out);
     }
 
     // -----------------------------------------------------------------------

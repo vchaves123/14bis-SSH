@@ -1,13 +1,12 @@
 package br.com.quatorzebis.ssh;
 
+import br.com.quatorzebis.ssh.storage.SecureFiles;
 import br.com.quatorzebis.ssh.ui.MainWindow;
 import org.eclipse.swt.widgets.Display;
 
 import java.io.IOException;
 import java.io.PrintStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -25,11 +24,9 @@ public class Main {
 
     private static void redirectConsoleToLog() {
         try {
-            Path logDir = Path.of(System.getProperty("user.home"), ".14bis", "log");
-            Files.createDirectories(logDir);
-            Path file = logDir.resolve("app.log");
+            Path file = Path.of(System.getProperty("user.home"), ".14bis", "log", "app.log");
             PrintStream ps = new PrintStream(
-                Files.newOutputStream(file, StandardOpenOption.CREATE, StandardOpenOption.APPEND),
+                SecureFiles.openAppend(file),
                 true, "UTF-8");
             System.setOut(ps);
             System.setErr(ps);

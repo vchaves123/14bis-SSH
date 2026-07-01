@@ -673,7 +673,7 @@ public class TerminalTab {
                          ? info.logDir
                          : System.getProperty("user.home") + "/.14bis/screen_captures";
             Path logDir = Path.of(dir);
-            Files.createDirectories(logDir);
+            br.com.quatorzebis.ssh.storage.SecureFiles.createDirectories(logDir);
             String ts       = LocalDateTime.now().format(LOG_TS);
             String baseName = (info.logFileName != null && !info.logFileName.isBlank())
                               ? info.logFileName.replaceAll("[^\\w\\-.]", "_")
@@ -682,8 +682,7 @@ public class TerminalTab {
             Path   file = logDir.resolve(candidate + ".log");
             if (Files.exists(file))
                 file = logDir.resolve(candidate + "_" + LOG_SEQ.incrementAndGet() + ".log");
-            logStream  = Files.newOutputStream(file,
-                StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            logStream  = br.com.quatorzebis.ssh.storage.SecureFiles.openAppend(file);
             ansiState  = AnsiState.NORMAL;
         } catch (IOException e) {
             logStream = null;

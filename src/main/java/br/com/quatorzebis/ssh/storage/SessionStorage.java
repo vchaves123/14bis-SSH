@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.*;
+import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -32,7 +33,7 @@ public final class SessionStorage {
 
     public static void save(SessionInfo s) throws IOException {
         Path dir = dir(s.group);
-        Files.createDirectories(dir);
+        SecureFiles.createDirectories(dir);
 
         Properties p = new Properties();
         p.setProperty("id",       s.id);
@@ -51,7 +52,15 @@ public final class SessionStorage {
         p.setProperty("logDir",      s.logDir      != null ? s.logDir      : "");
         p.setProperty("logFileName", s.logFileName  != null ? s.logFileName : "");
 
-        try (OutputStream out = Files.newOutputStream(dir.resolve(s.fileName()))) {
+        Path file = dir.resolve(s.fileName());
+        try (OutputStream out = SecureFiles.openAppend(file)) {
+            // openAppend creates the file with restricted permissions;
+            // we truncate + rewrite by deleting first to avoid stale keys.
+            out.close();
+        }
+        // Delete then rewrite so Properties.store always produces a fresh file.
+        Files.deleteIfExists(file);
+        try (OutputStream out = SecureFiles.openAppend(file)) {
             p.store(out, "14bis SSH session");
         }
     }
@@ -102,7 +111,7 @@ public final class SessionStorage {
 
     public static void createGroup(String groupName) throws IOException {
         if (groupName == null || groupName.isBlank()) return;
-        Files.createDirectories(BASE.resolve(sanitize(groupName)));
+        SecureFiles.createDirectories(BASE.resolve(sanitize(groupName)));
     }
 
     public static void deleteGroup(String groupName) throws IOException {
