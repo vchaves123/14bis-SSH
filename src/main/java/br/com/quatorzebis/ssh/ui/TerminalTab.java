@@ -1019,6 +1019,8 @@ public class TerminalTab {
 
     private void handleDisconnect() {
         disconnected = true;
+        activityPending = false;
+        blinkRunning    = false;
         display.asyncExec(() -> {
             if (tabItem.isDisposed()) return;
             tabItem.setFont(getBoldTabFont());
