@@ -133,15 +133,17 @@ public class SessionsTab {
         filler.setBackground(display.getSystemColor(SWT.COLOR_BLACK));
         filler.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, true));
 
-        // Build version — bottom-right, subtle
-        Label lblVersion = new Label(info, SWT.RIGHT);
-        lblVersion.setText("v" + BuildInfo.VERSION + "  build #" + BuildInfo.BUILD + "  —  " + BuildInfo.DATE);
+        // Build version — bottom-right, subtle; links to this release on GitHub
+        String releaseUrl = "https://github.com/vchaves123/14bis-SSH/releases/tag/v" + BuildInfo.VERSION;
+        Link lblVersion = new Link(info, SWT.RIGHT);
+        lblVersion.setText("<a href=\"" + releaseUrl + "\">v" + BuildInfo.VERSION + "  build #" + BuildInfo.BUILD + "  —  " + BuildInfo.DATE + "</a>");
         lblVersion.setBackground(display.getSystemColor(SWT.COLOR_BLACK));
         lblVersion.setForeground(new Color(display, 60, 60, 60));
         Font vFont = new Font(display, "Consolas", 9, SWT.NORMAL);
         lblVersion.setFont(vFont);
         lblVersion.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
         lblVersion.addDisposeListener(e -> vFont.dispose());
+        lblVersion.addListener(SWT.Selection, e -> Program.launch(e.text));
 
         // Update notice — hidden until a newer release is found on GitHub
         Link lblUpdate = new Link(info, SWT.RIGHT);
