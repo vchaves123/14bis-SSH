@@ -186,6 +186,10 @@ public final class SessionStorage {
     }
 
     public static String sanitize(String name) {
-        return name.replaceAll("[^\\w\\-. ]", "_").trim();
+        String s = name.replaceAll("[^\\w\\-. ]", "_").trim();
+        // "." and ".." are special path segments — left unblocked, a group named ".."
+        // would resolve outside sessions/ into ~/.14bis itself (alongside the vault).
+        if (s.isEmpty() || s.equals(".") || s.equals("..")) return "_group";
+        return s;
     }
 }

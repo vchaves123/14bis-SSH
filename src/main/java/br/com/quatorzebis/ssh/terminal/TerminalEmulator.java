@@ -17,6 +17,8 @@ public class TerminalEmulator {
     // -----------------------------------------------------------------------
     public static final int DEFAULT_COLOR  = -1;
     public static final int MAX_SCROLLBACK = 10_000;
+    /** Caps OSC/DCS/PM/APC string payload growth if a server never sends the terminator. */
+    private static final int MAX_OSC_LEN   = 8_192;
 
     private static final int[] PALETTE = buildPalette();
 
@@ -264,10 +266,10 @@ public class TerminalEmulator {
         } else if (state == State.OSC) {
             if      (b == 0x1B) state = State.OSC_ESC;
             else if (b == 0x07) { state = State.NORMAL; oscBuffer.setLength(0); }
-            else                oscBuffer.append((char) b);
+            else if (oscBuffer.length() < MAX_OSC_LEN) oscBuffer.append((char) b);
         } else if (state == State.OSC_ESC) {
             if (b == '\\') { state = State.NORMAL; oscBuffer.setLength(0); }
-            else           { state = State.OSC; oscBuffer.append((char) b); }
+            else           { state = State.OSC; if (oscBuffer.length() < MAX_OSC_LEN) oscBuffer.append((char) b); }
         } else if (state == State.CHARSET_G0) {
             g0LineDrawing = (b == '0');
             state = State.NORMAL;
@@ -455,6 +457,11 @@ public class TerminalEmulator {
     }
 
     private void insertLines(int n) {
+        // Beyond this many repeats, [cursorRow, scrollBottom] is already fully
+        // cleared and further iterations are no-ops — clamping avoids an
+        // attacker-supplied repeat count (up to ~2^31) spinning the parser
+        // thread (and, via the shared lock, the UI thread) for a long time.
+        n = Math.min(n, scrollBottom - cursorRow + 1);
         for (int i = 0; i < n; i++) {
             for (int r = scrollBottom; r > cursorRow; r--)
                 for (int c = 0; c < cols; c++) activeBuffer[r][c].copyFrom(activeBuffer[r - 1][c]);
@@ -463,6 +470,8 @@ public class TerminalEmulator {
     }
 
     private void deleteLines(int n) {
+        // See insertLines() — same clamp rationale, mirrored for the delete direction.
+        n = Math.min(n, scrollBottom - cursorRow + 1);
         for (int i = 0; i < n; i++) {
             for (int r = cursorRow; r < scrollBottom; r++)
                 for (int c = 0; c < cols; c++) activeBuffer[r][c].copyFrom(activeBuffer[r + 1][c]);

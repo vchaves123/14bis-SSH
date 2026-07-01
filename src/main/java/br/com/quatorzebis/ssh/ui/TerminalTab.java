@@ -112,6 +112,9 @@ public class TerminalTab {
     // State machine for stripping ANSI escape sequences from the log stream.
     private enum AnsiState { NORMAL, ESC, ESC_INTERMEDIATE, CSI, OSC, OSC_ESC }
     private AnsiState ansiState = AnsiState.NORMAL;
+    /** Remaining UTF-8 continuation bytes expected — needed to tell a genuine multi-byte
+     *  character apart from an 8-bit C1 control byte (0x80-0x9F overlaps both ranges). */
+    private int ansiUtf8Remaining = 0;
 
     // -----------------------------------------------------------------------
     // Constructor
@@ -705,6 +708,7 @@ public class TerminalTab {
                 file = logDir.resolve(candidate + "_" + LOG_SEQ.incrementAndGet() + ".log");
             logStream  = br.com.quatorzebis.ssh.storage.SecureFiles.openAppend(file);
             ansiState  = AnsiState.NORMAL;
+            ansiUtf8Remaining = 0;
         } catch (IOException e) {
             logStream = null;
         }
@@ -725,16 +729,34 @@ public class TerminalTab {
             int b = buf[i] & 0xFF;
             switch (ansiState) {
                 case NORMAL:
+                    if (ansiUtf8Remaining > 0) {
+                        if ((b & 0xC0) == 0x80) {
+                            // continuation byte of a multi-byte UTF-8 character — not a C1 control
+                            out[w++] = (byte) b;
+                            ansiUtf8Remaining--;
+                            break;
+                        }
+                        ansiUtf8Remaining = 0; // invalid sequence — fall through and reprocess b fresh
+                    }
                     if (b == 0x1B) {
                         ansiState = AnsiState.ESC;
+                    } else if (b >= 0x80 && b <= 0x9F) {
+                        // 8-bit C1 control — the terminal emulator (TerminalEmulator.processC1)
+                        // treats these as CSI/OSC/etc. introducers just like 7-bit ESC sequences.
+                        // Strip them the same way so a crafted C1 sequence can't smuggle raw
+                        // escape bytes into the plaintext log.
+                        switch (b) {
+                            case 0x9B -> ansiState = AnsiState.CSI;
+                            case 0x90, 0x98, 0x9D, 0x9E, 0x9F -> ansiState = AnsiState.OSC;
+                            default -> {} // other C1 controls (IND/NEL/RI/ST...) — discard, stay NORMAL
+                        }
                     } else if (b == '\r' || b == '\n' || b == '\t') {
                         out[w++] = (byte) b;
                     } else if (b >= 0x20 && b < 0x7F) {
                         out[w++] = (byte) b;
-                    } else if (b >= 0x80) {
-                        // UTF-8 continuation / leading bytes — pass through
-                        out[w++] = (byte) b;
-                    }
+                    } else if ((b & 0xE0) == 0xC0) { out[w++] = (byte) b; ansiUtf8Remaining = 1; }
+                    else if ((b & 0xF0) == 0xE0)   { out[w++] = (byte) b; ansiUtf8Remaining = 2; }
+                    else if ((b & 0xF8) == 0xF0)   { out[w++] = (byte) b; ansiUtf8Remaining = 3; }
                     // other control chars (0x00-0x1F except \r\n\t) — discard
                     break;
                 case ESC:
