@@ -149,6 +149,60 @@ jobs:
           Remove-Item $pfx -Force
           Write-Host "Signed: $installer"
 
+      - name: Package with jpackage (Windows portable)
+        if: matrix.runner == 'windows-latest'
+        shell: cmd
+        run: |
+          jpackage ^
+            --input target ^
+            --name "14bis SSH" ^
+            --main-jar 14bis-ssh-${{ steps.ver.outputs.jar }}.jar ^
+            --main-class br.com.quatorzebis.ssh.Main ^
+            --type app-image ^
+            --app-version ${{ steps.ver.outputs.app }} ^
+            --vendor "Molho Ltda." ^
+            --copyright "Copyright (C) 2026 Vicente Melo - Molho Ltda." ^
+            --description "Lightweight SSH terminal client" ^
+            --icon target\app-icon.ico ^
+            --dest installer-portable
+
+      - name: Sign Windows portable exe
+        if: matrix.runner == 'windows-latest'
+        shell: pwsh
+        env:
+          CERT_BASE64: ${{ secrets.CODE_SIGN_CERT_BASE64 }}
+          CERT_PASS:   ${{ secrets.CODE_SIGN_PASSWORD }}
+        run: |
+          if (-not $env:CERT_BASE64) {
+            Write-Host "CODE_SIGN_CERT_BASE64 secret not set — skipping signing."
+            exit 0
+          }
+          $pfx = Join-Path $env:TEMP "codesign-portable.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_BASE64))
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" `
+            -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -like '*x64*' } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $signtool) { Write-Error "signtool.exe not found"; exit 1 }
+          $exe = (Get-ChildItem "installer-portable\14bis SSH\14bis SSH.exe").FullName
+          & $signtool sign `
+            /fd  SHA256 `
+            /td  SHA256 `
+            /tr  http://timestamp.sectigo.com `
+            /f   $pfx `
+            /p   $env:CERT_PASS `
+            $exe
+          Remove-Item $pfx -Force
+          Write-Host "Signed: $exe"
+
+      - name: Zip Windows portable build
+        if: matrix.runner == 'windows-latest'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "installer-portable\14bis SSH\*" `
+            -DestinationPath "installer\14bis-SSH-windows-portable-${{ steps.ver.outputs.app }}.zip"
+
       - name: Install rpmbuild (Linux)
         if: matrix.runner == 'ubuntu-latest'
         run: sudo apt-get update -qq && sudo apt-get install -y rpm
@@ -268,7 +322,8 @@ jobs:
 
             | Platform | File |
             |----------|------|
-            | Windows  | `14bis-SSH-windows-${{ needs.build.outputs.app-version }}.exe` |
+            | Windows (installer) | `14bis-SSH-windows-${{ needs.build.outputs.app-version }}.exe` |
+            | Windows (portable, no install / no admin required — unzip and run `14bis SSH.exe`) | `14bis-SSH-windows-portable-${{ needs.build.outputs.app-version }}.zip` |
             | Linux (Debian/Ubuntu) | `14bis-SSH-linux-${{ needs.build.outputs.app-version }}.deb` |
             | Linux (RHEL/OEL/AlmaLinux/Rocky Linux/SUSE/etc.) | `14bis-SSH-linux-${{ needs.build.outputs.app-version }}.rpm` |
             | Linux (portable, no install — unpack and run `bin/ssh-14bis`) | `14bis-SSH-linux-${{ needs.build.outputs.app-version }}.tar.gz` |
