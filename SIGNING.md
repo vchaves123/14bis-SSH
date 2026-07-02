@@ -2,19 +2,12 @@
 
 The Windows installer is signed automatically by GitHub Actions when a code-signing
 certificate is configured as repository secrets. Without a certificate the build
-succeeds but the installer is unsigned (Windows Smart App Control will block it).
+succeeds but the installer is unsigned (Windows Smart App Control will block it, and
+the Microsoft Store will reject the submission).
 
-## Option 1 — SignPath Foundation (free for open-source)
+**Current status:** no certificate is configured yet — releases are currently unsigned.
 
-[SignPath.io](https://signpath.io/code-signing-for-open-source/) provides free
-code-signing certificates for open-source projects. Requirements:
-- Public GitHub repository with an OSI-approved license (GPL v3 ✓)
-- Apply at https://signpath.io/code-signing-for-open-source/
-
-Their GitHub Actions integration can replace the signing step in
-`.github/workflows/release.yml` once approved.
-
-## Option 2 — Own PFX certificate (any CA)
+## Own PFX certificate (any CA)
 
 1. Obtain a code-signing certificate (OV or EV) from Sectigo, DigiCert, etc.
 2. Export it as a `.pfx` file (PKCS#12, includes private key).

@@ -89,7 +89,8 @@ Log files are saved as `yyyyMMdd_HHmmss_<name>.log` under the configured directo
 
 ## Code signing
 
-The Windows installer is code-signed. This project uses [SignPath Foundation](https://signpath.io/code-signing-for-open-source/) for code signing of Windows installers.
+The Windows installer is not yet code-signed. See [SIGNING.md](SIGNING.md) for details
+and options.
 
 ## License
 
