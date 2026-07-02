@@ -174,6 +174,7 @@ public final class CredentialStore {
         for (CredentialEntry e : list) {
             sb.append("e.").append(e.id).append(".l=").append(esc(e.label))   .append('\n');
             sb.append("e.").append(e.id).append(".u=").append(esc(e.username)).append('\n');
+            sb.append("e.").append(e.id).append(".k=").append(esc(e.keyPath != null ? e.keyPath : "")).append('\n');
             sb.append("e.").append(e.id).append(".p=");
             escChars(e.password, sb);
             sb.append('\n');
@@ -238,6 +239,7 @@ public final class CredentialStore {
             switch (p[2]) {
                 case "l" -> ce.label    = unesc(new String(chars, valStart, valEnd - valStart));
                 case "u" -> ce.username = unesc(new String(chars, valStart, valEnd - valStart));
+                case "k" -> ce.keyPath  = unesc(new String(chars, valStart, valEnd - valStart));
                 case "p" -> ce.password = unescChars(chars, valStart, valEnd);
             }
         }

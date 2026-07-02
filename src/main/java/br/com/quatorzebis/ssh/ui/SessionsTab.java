@@ -12,7 +12,7 @@ import org.eclipse.swt.layout.*;
 import org.eclipse.swt.program.Program;
 import org.eclipse.swt.widgets.*;
 
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 
 /**
  * The permanent "Sessions" tab.
@@ -29,7 +29,7 @@ public class SessionsTab {
     private final SessionTreePanel treePanel;
 
     public SessionsTab(CTabFolder folder, Shell shell,
-                       Consumer<SessionInfo> onConnect,
+                       BiConsumer<SessionInfo, char[]> onConnect,
                        Runnable onCredentials, Runnable onAbout) {
 
         tabItem = new CTabItem(folder, SWT.NONE);   // no close button
@@ -112,20 +112,16 @@ public class SessionsTab {
         btnRow.setLayout(rl);
 
         Button btnCreds    = new Button(btnRow, SWT.PUSH); btnCreds.setText("  Credential Manager  ");
-        Button btnAppear   = new Button(btnRow, SWT.PUSH); btnAppear.setText("  Default Appearance  ");
+        Button btnConfig   = new Button(btnRow, SWT.PUSH); btnConfig.setText("  Configuration Setting  ");
         Button btnAbout    = new Button(btnRow, SWT.PUSH); btnAbout.setText("  About  ");
 
         btnCreds.addListener(SWT.Selection,  e -> onCredentials.run());
         btnAbout.addListener(SWT.Selection,  e -> onAbout.run());
-        btnAppear.addListener(SWT.Selection, e -> {
-            TerminalAppearanceDialog dlg = new TerminalAppearanceDialog(shell,
-                br.com.quatorzebis.ssh.storage.AppearanceSettings.getFontName(),
-                br.com.quatorzebis.ssh.storage.AppearanceSettings.getFontSize(),
-                br.com.quatorzebis.ssh.storage.AppearanceSettings.getFgColor(),
-                br.com.quatorzebis.ssh.storage.AppearanceSettings.getBgColor());
+        btnConfig.addListener(SWT.Selection, e -> {
+            ConfigurationSettingsDialog dlg = new ConfigurationSettingsDialog(
+                shell, "Configuration Setting", br.com.quatorzebis.ssh.storage.SessionDefaults.get());
             if (dlg.open()) {
-                br.com.quatorzebis.ssh.storage.AppearanceSettings.set(
-                    dlg.getChosenFontName(), dlg.getChosenFontSize(), dlg.getChosenFgColor(), dlg.getChosenBgColor());
+                br.com.quatorzebis.ssh.storage.SessionDefaults.set(dlg.getResult());
             }
         });
 

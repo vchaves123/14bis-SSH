@@ -154,8 +154,17 @@ public class MainWindow {
     // Open a terminal tab for a session
     // -----------------------------------------------------------------------
     private void openTerminal(SessionInfo info) {
-        ConnectDialog dlg = new ConnectDialog(shell, info);
+        openTerminal(info, null);
+    }
+
+    /** @param prefillPassword password just typed in the New Session dialog (manual auth,
+     *                         not saved to the vault) — pre-fills the Connect dialog once. */
+    private void openTerminal(SessionInfo info, char[] prefillPassword) {
+        ConnectDialog dlg = prefillPassword != null
+            ? new ConnectDialog(shell, info, prefillPassword)
+            : new ConnectDialog(shell, info);
         char[] password = dlg.open();
+        if (prefillPassword != null) java.util.Arrays.fill(prefillPassword, '\0');
         if (password == null) return;
 
         TerminalTab tab = new TerminalTab(tabFolder, info, password);
@@ -194,7 +203,7 @@ public class MainWindow {
         SessionInfo saved = dlg.open();
         if (saved != null) {
             sessionsTab.reload();
-            openTerminal(saved);
+            openTerminal(saved, dlg.getEnteredPassword());
         }
     }
 
@@ -328,39 +337,9 @@ public class MainWindow {
 
             new MenuItem(menu, SWT.SEPARATOR);
 
-            MenuItem miAppearance = new MenuItem(menu, SWT.PUSH);
-            miAppearance.setText("Terminal Appearance...");
-            miAppearance.addListener(SWT.Selection, ev -> {
-                int[] a = terminal.getAppearance();
-                TerminalAppearanceDialog dlg = new TerminalAppearanceDialog(shell,
-                    terminal.getFontName(),
-                    a[0],
-                    new org.eclipse.swt.graphics.RGB(a[1], a[2], a[3]),
-                    new org.eclipse.swt.graphics.RGB(a[4], a[5], a[6]));
-                if (dlg.open()) {
-                    terminal.applyAppearance(dlg.getChosenFontName(),
-                                             dlg.getChosenFontSize(),
-                                             dlg.getChosenFgColor(),
-                                             dlg.getChosenBgColor());
-                }
-            });
-
-            new MenuItem(menu, SWT.SEPARATOR);
-
-            if (terminal.isLogging()) {
-                MenuItem miLogStop = new MenuItem(menu, SWT.PUSH);
-                miLogStop.setText("Stop Logging");
-                miLogStop.addListener(SWT.Selection, ev -> terminal.stopLogging());
-            } else {
-                MenuItem miLogStart = new MenuItem(menu, SWT.PUSH);
-                miLogStart.setText("Start Logging");
-                miLogStart.addListener(SWT.Selection, ev ->
-                    terminal.startLogging(terminal.getLogDir(), terminal.getLogFileName()));
-            }
-
-            MenuItem miLogChange = new MenuItem(menu, SWT.PUSH);
-            miLogChange.setText("Log Settings...");
-            miLogChange.addListener(SWT.Selection, ev -> showLogSettingsDialog(terminal));
+            MenuItem miSettings = new MenuItem(menu, SWT.PUSH);
+            miSettings.setText("Settings...");
+            miSettings.addListener(SWT.Selection, ev -> showConfigurationSettingsDialog(terminal));
 
             new MenuItem(menu, SWT.SEPARATOR);
 
@@ -387,60 +366,40 @@ public class MainWindow {
         }
     }
 
-    private void showLogSettingsDialog(TerminalTab terminal) {
-        Shell dlg = new Shell(shell, SWT.APPLICATION_MODAL | SWT.DIALOG_TRIM);
-        dlg.setText("Log Settings");
-        AppIcon.apply(dlg);
-        GridLayout gl = new GridLayout(3, false);
-        gl.marginWidth = 14; gl.marginHeight = 12; gl.verticalSpacing = 8;
-        dlg.setLayout(gl);
+    /** Opens the shared Configuration Setting dialog seeded from this tab's live state.
+     *  Effects apply only to this running terminal — nothing is persisted to the session file. */
+    private void showConfigurationSettingsDialog(TerminalTab terminal) {
+        br.com.quatorzebis.ssh.model.SessionInfo info = terminal.getSessionInfo();
+        int[] a = terminal.getAppearance();
 
-        Label lblDir = new Label(dlg, SWT.NONE); lblDir.setText("Directory:");
-        Text txtDir = new Text(dlg, SWT.BORDER | SWT.READ_ONLY);
-        txtDir.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
-        txtDir.setText(terminal.getLogDir());
-        Button btnBrowse = new Button(dlg, SWT.PUSH); btnBrowse.setText("…");
-        btnBrowse.addListener(SWT.Selection, e -> {
-            DirectoryDialog dd = new DirectoryDialog(dlg, SWT.NONE);
-            dd.setText("Select log directory");
-            dd.setFilterPath(txtDir.getText());
-            String chosen = dd.open();
-            if (chosen != null) txtDir.setText(chosen);
-        });
+        br.com.quatorzebis.ssh.model.ConfigurationSettings current =
+            new br.com.quatorzebis.ssh.model.ConfigurationSettings();
+        current.appearFontName = terminal.getFontName();
+        current.appearFontSize = a[0];
+        current.appearFgR = a[1]; current.appearFgG = a[2]; current.appearFgB = a[3];
+        current.appearBgR = a[4]; current.appearBgG = a[5]; current.appearBgB = a[6];
+        current.logEnabled  = terminal.isLogging();
+        current.logDir      = terminal.getLogDir();
+        current.logFileName = terminal.getLogFileName();
+        current.terminalType  = info.terminalType;
+        current.backspaceCode = info.backspaceCode;
 
-        Label lblFile = new Label(dlg, SWT.NONE); lblFile.setText("File name:");
-        Text txtFile = new Text(dlg, SWT.BORDER);
-        GridData gdFile = new GridData(SWT.FILL, SWT.CENTER, true, false);
-        gdFile.horizontalSpan = 2;
-        txtFile.setLayoutData(gdFile);
-        txtFile.setMessage("e.g. session (timestamp prepended automatically)");
-        txtFile.setText(terminal.getLogFileName());
+        ConfigurationSettingsDialog dlg = new ConfigurationSettingsDialog(shell, "Configuration Setting", current, info.host);
+        if (!dlg.open()) return;
+        br.com.quatorzebis.ssh.model.ConfigurationSettings s = dlg.getResult();
 
-        new Label(dlg, SWT.NONE);
-        Composite cmpBtns = new Composite(dlg, SWT.NONE);
-        GridData gdBtns = new GridData(SWT.RIGHT, SWT.CENTER, true, false);
-        gdBtns.horizontalSpan = 2;
-        cmpBtns.setLayoutData(gdBtns);
-        org.eclipse.swt.layout.RowLayout rl = new org.eclipse.swt.layout.RowLayout(SWT.HORIZONTAL);
-        rl.spacing = 8; cmpBtns.setLayout(rl);
+        terminal.applyAppearance(s.appearFontName, s.appearFontSize,
+            new org.eclipse.swt.graphics.RGB(s.appearFgR, s.appearFgG, s.appearFgB),
+            new org.eclipse.swt.graphics.RGB(s.appearBgR, s.appearBgG, s.appearBgB));
 
-        Button btnApply  = new Button(cmpBtns, SWT.PUSH); btnApply.setText("Apply & Start");
-        Button btnCancel = new Button(cmpBtns, SWT.PUSH); btnCancel.setText("Cancel");
-        dlg.setDefaultButton(btnApply);
+        if (s.logEnabled) {
+            terminal.startLogging(s.logDir, s.logFileName);
+        } else if (terminal.isLogging()) {
+            terminal.stopLogging();
+        }
 
-        btnCancel.addListener(SWT.Selection, e -> dlg.dispose());
-        btnApply.addListener(SWT.Selection, e -> {
-            terminal.startLogging(txtDir.getText().trim(), txtFile.getText().trim());
-            dlg.dispose();
-        });
-
-        dlg.pack();
-        dlg.setSize(Math.max(dlg.getSize().x, 420), dlg.getSize().y);
-        Rectangle pb = shell.getBounds();
-        org.eclipse.swt.graphics.Point sz = dlg.getSize();
-        dlg.setLocation(pb.x + (pb.width - sz.x) / 2, pb.y + (pb.height - sz.y) / 2);
-        dlg.open();
-        while (!dlg.isDisposed()) { if (!display.readAndDispatch()) display.sleep(); }
+        info.terminalType  = s.terminalType;
+        info.backspaceCode = s.backspaceCode;
     }
 
     private void closeAll() {

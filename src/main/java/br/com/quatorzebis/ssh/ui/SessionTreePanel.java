@@ -11,7 +11,7 @@ import org.eclipse.swt.widgets.*;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 
 /**
  * Left-side panel showing the session tree.
@@ -27,8 +27,10 @@ public class SessionTreePanel {
     private final Tree      tree;
     private final Shell     shell;
 
-    /** Called when the user wants to open a connection (double-click / Enter / Connect). */
-    private final Consumer<SessionInfo> onConnect;
+    /** Called when the user wants to open a connection (double-click / Enter / Connect).
+     *  Second argument is a just-typed manual password to pre-fill the Connect dialog with
+     *  (non-null only right after creating a new session), or null otherwise. */
+    private final BiConsumer<SessionInfo, char[]> onConnect;
 
     /** Called after any session/group is created, edited, or deleted. */
     private Runnable onChanged = () -> {};
@@ -57,7 +59,7 @@ public class SessionTreePanel {
     // -----------------------------------------------------------------------
     // Construction
     // -----------------------------------------------------------------------
-    public SessionTreePanel(Composite parent, Shell shell, Consumer<SessionInfo> onConnect) {
+    public SessionTreePanel(Composite parent, Shell shell, BiConsumer<SessionInfo, char[]> onConnect) {
         this.shell     = shell;
         this.onConnect = onConnect;
 
@@ -211,7 +213,7 @@ public class SessionTreePanel {
         if (sel.length == 0) return;
         Object data = sel[0].getData();
         if (data instanceof SessionInfo s) {
-            onConnect.accept(s);
+            onConnect.accept(s, null);
         } else if (data instanceof String) {
             TreeItem item = sel[0];
             item.setExpanded(!item.getExpanded());
@@ -282,7 +284,10 @@ public class SessionTreePanel {
     public void newSession(String group) {
         SessionDialog dlg = new SessionDialog(shell, group);
         SessionInfo result = dlg.open();
-        if (result != null) { reload(); expandGroup(result.group); onChanged.run(); }
+        if (result != null) {
+            reload(); expandGroup(result.group); onChanged.run();
+            onConnect.accept(result, dlg.getEnteredPassword());
+        }
     }
 
     private void newGroup() {

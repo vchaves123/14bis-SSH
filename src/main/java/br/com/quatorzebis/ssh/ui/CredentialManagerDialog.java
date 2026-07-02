@@ -124,32 +124,68 @@ public class CredentialManagerDialog {
         Shell dlg = new Shell(owner, SWT.APPLICATION_MODAL | SWT.DIALOG_TRIM);
         dlg.setText(existing == null ? "New Credential" : "Edit Credential");
         AppIcon.apply(dlg);
-        dlg.setSize(380, 240);
+        dlg.setSize(400, 290);
         center(dlg, owner);
 
-        GridLayout gl = new GridLayout(2, false);
+        GridLayout gl = new GridLayout(3, false);
         gl.marginWidth = 14; gl.marginHeight = 10; gl.verticalSpacing = 8;
         dlg.setLayout(gl);
 
         lbl(dlg, "Label:");
-        Text txtLabel = txt(dlg);
+        Text txtLabel = txt(dlg, 2);
         txtLabel.setMessage("e.g. prod-root");
 
         lbl(dlg, "Username:");
-        Text txtUser = txt(dlg);
+        Text txtUser = txt(dlg, 2);
 
-        lbl(dlg, "Password:");
-        Text txtPass = PasswordField.create(dlg, new GridData(SWT.FILL, SWT.CENTER, true, false));
+        new Label(dlg, SWT.NONE);
+        Button chkKey = new Button(dlg, SWT.CHECK);
+        chkKey.setText("Use private key");
+        chkKey.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, false, 2, 1));
+
+        Label lblKey = lbl(dlg, "Key file:");
+        lblKey.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, false));
+        Text txtKeyPath = new Text(dlg, SWT.BORDER | SWT.READ_ONLY);
+        txtKeyPath.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        Button btnBrowse = new Button(dlg, SWT.PUSH); btnBrowse.setText("…");
+        btnBrowse.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, false));
+
+        Label lblPass = lbl(dlg, "Password:");
+        Text txtPass = PasswordField.create(dlg, new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
+
+        Runnable updateKeyMode = () -> {
+            boolean useKey = chkKey.getSelection();
+            lblKey.setVisible(useKey);
+            txtKeyPath.setVisible(useKey);
+            btnBrowse.setVisible(useKey);
+            ((GridData) lblKey.getLayoutData()).exclude = !useKey;
+            ((GridData) txtKeyPath.getLayoutData()).exclude = !useKey;
+            ((GridData) btnBrowse.getLayoutData()).exclude = !useKey;
+            lblPass.setText(useKey ? "Passphrase:" : "Password:");
+            dlg.layout(true, true);
+        };
+
+        btnBrowse.addListener(SWT.Selection, e -> {
+            FileDialog fd = new FileDialog(dlg, SWT.OPEN);
+            fd.setText("Select private key");
+            String path = fd.open();
+            if (path != null) txtKeyPath.setText(path);
+        });
+        chkKey.addListener(SWT.Selection, e -> updateKeyMode.run());
 
         if (existing != null) {
             txtLabel.setText(existing.label);
             txtUser.setText(existing.username);
             txtPass.setTextChars(existing.password);
+            boolean useKey = existing.keyPath != null && !existing.keyPath.isBlank();
+            chkKey.setSelection(useKey);
+            if (useKey) txtKeyPath.setText(existing.keyPath);
         }
+        updateKeyMode.run();
 
         new Label(dlg, SWT.NONE);
         Composite cmpBtns = new Composite(dlg, SWT.NONE);
-        cmpBtns.setLayoutData(new GridData(SWT.RIGHT, SWT.CENTER, true, false));
+        cmpBtns.setLayoutData(new GridData(SWT.RIGHT, SWT.CENTER, true, false, 2, 1));
         RowLayout rl = new RowLayout(SWT.HORIZONTAL); rl.spacing = 8;
         cmpBtns.setLayout(rl);
         Button btnSave   = new Button(cmpBtns, SWT.PUSH); btnSave.setText("Save");
@@ -163,10 +199,14 @@ public class CredentialManagerDialog {
         btnSave.addListener(SWT.Selection, e -> {
             String user = txtUser.getText().trim();
             if (user.isEmpty()) { error(dlg, "Username is required."); return; }
+            if (chkKey.getSelection() && txtKeyPath.getText().trim().isEmpty()) {
+                error(dlg, "Key file is required."); return;
+            }
             CredentialEntry ce = existing != null ? existing : new CredentialEntry();
             ce.label    = txtLabel.getText().trim();
             ce.username = user;
             ce.password = txtPass.getTextChars();
+            ce.keyPath  = chkKey.getSelection() ? txtKeyPath.getText().trim() : "";
             result[0]   = ce;
             dlg.dispose();
         });
@@ -184,10 +224,19 @@ public class CredentialManagerDialog {
         b.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
         return b;
     }
-    private static void lbl(Composite p, String text) { new Label(p, SWT.NONE).setText(text); }
+    private static Label lbl(Composite p, String text) {
+        Label l = new Label(p, SWT.NONE); l.setText(text); return l;
+    }
     private static Text txt(Composite p) {
         Text t = new Text(p, SWT.BORDER);
         t.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        return t;
+    }
+    private static Text txt(Composite p, int colspan) {
+        Text t = new Text(p, SWT.BORDER);
+        GridData gd = new GridData(SWT.FILL, SWT.CENTER, true, false);
+        gd.horizontalSpan = colspan;
+        t.setLayoutData(gd);
         return t;
     }
     private static void error(Shell parent, String msg) {

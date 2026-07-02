@@ -23,11 +23,23 @@ public class ConnectDialog {
 
     private final Shell       parent;
     private final SessionInfo session;
+    private final char[]      prefillPassword; // used once, only when the manual dialog is shown
     private char[]            result;  // null = cancelled
 
     public ConnectDialog(Shell parent, SessionInfo session) {
-        this.parent  = parent;
-        this.session = session;
+        this(parent, session, null);
+    }
+
+    /**
+     * @param prefillPassword password/passphrase just typed in the New Session dialog
+     *                        (manual auth, not saved to the vault). Pre-fills the field so the
+     *                        user isn't asked to retype it on the very first connect. Never
+     *                        persisted — only used for this one dialog instance.
+     */
+    public ConnectDialog(Shell parent, SessionInfo session, char[] prefillPassword) {
+        this.parent          = parent;
+        this.session         = session;
+        this.prefillPassword = prefillPassword;
     }
 
     /**
@@ -75,22 +87,29 @@ public class ConnectDialog {
         if (keyAuth && session.keyPath != null && !session.keyPath.isBlank())
             info(dlg, "Key:", session.keyPath);
 
-        // Credential picker (only when vault exists or unlocked)
+        // Credential picker — only unlocks the vault if the user actually opens the
+        // dropdown to pick a saved credential; plain manual auth never touches it.
+        final List<CredentialEntry>[] credsHolder = new List[]{ List.of() };
         Combo credCombo = null;
-        List<CredentialEntry> creds = List.of();
         if (store.vaultExists()) {
             new Label(dlg, SWT.NONE).setText("Credential:");
-            credCombo = new Combo(dlg, SWT.DROP_DOWN | SWT.READ_ONLY);
-            credCombo.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
-            credCombo.add(MANUAL);
-
-            if (!store.isUnlocked()) {
-                boolean ok = new MasterPasswordDialog(parent).open();
-                if (!ok) { dlg.dispose(); return null; }
+            Combo cc = new Combo(dlg, SWT.DROP_DOWN | SWT.READ_ONLY);
+            cc.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+            cc.add(MANUAL);
+            cc.select(0);
+            if (store.isUnlocked()) {
+                credsHolder[0] = store.getAll();
+                for (CredentialEntry ce : credsHolder[0]) cc.add(ce.toString());
+            } else {
+                cc.addListener(SWT.MouseDown, e -> {
+                    if (store.isUnlocked()) return;
+                    if (new MasterPasswordDialog(parent).open()) {
+                        credsHolder[0] = store.getAll();
+                        for (CredentialEntry ce : credsHolder[0]) cc.add(ce.toString());
+                    }
+                });
             }
-            creds = store.getAll();
-            for (CredentialEntry ce : creds) credCombo.add(ce.toString());
-            credCombo.select(0);
+            credCombo = cc;
         }
 
         // Username
@@ -102,9 +121,9 @@ public class ConnectDialog {
         // Password / passphrase
         new Label(dlg, SWT.NONE).setText(keyAuth ? "Passphrase (optional):" : "Password:");
         Text txtPass = PasswordField.create(dlg, new GridData(SWT.FILL, SWT.CENTER, true, false));
+        if (prefillPassword != null) txtPass.setTextChars(prefillPassword);
 
         // Wire credential picker → auto-fill fields
-        final List<CredentialEntry> finalCreds = creds;
         final Combo finalCombo = credCombo;
         if (credCombo != null) {
             credCombo.addListener(SWT.Selection, e -> {
@@ -115,11 +134,14 @@ public class ConnectDialog {
                     txtPass.setText("");
                     txtPass.setEditable(true);
                 } else {
-                    CredentialEntry ce = finalCreds.get(idx - 1);
-                    txtUser.setText(ce.username);
-                    txtUser.setEditable(false);
-                    txtPass.setTextChars(ce.password);
-                    txtPass.setEditable(false);
+                    List<CredentialEntry> creds = credsHolder[0];
+                    if (idx - 1 < creds.size()) {
+                        CredentialEntry ce = creds.get(idx - 1);
+                        txtUser.setText(ce.username);
+                        txtUser.setEditable(false);
+                        txtPass.setTextChars(ce.password);
+                        txtPass.setEditable(false);
+                    }
                 }
             });
         }
